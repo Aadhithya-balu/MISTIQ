@@ -1,0 +1,15 @@
+from fastapi import APIRouter
+
+from app.api.routes import attempts, questions, students
+from app.api.routes import predictions, progress, health, recommendations
+from app.api.routes import research
+
+api_router = APIRouter()
+api_router.include_router(students.router, tags=["students"])
+api_router.include_router(questions.router, tags=["questions"])
+api_router.include_router(attempts.router, tags=["attempts"])
+api_router.include_router(predictions.router, tags=["predictions"])
+api_router.include_router(recommendations.router, tags=["recommendations"])
+api_router.include_router(progress.router, tags=["progress"])
+api_router.include_router(health.router, tags=["health"])
+api_router.include_router(research.router)

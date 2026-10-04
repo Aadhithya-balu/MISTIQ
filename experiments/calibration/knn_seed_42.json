@@ -1,0 +1,87 @@
+{
+  "brier_score": 0.9516389644811699,
+  "ece": 0.28517683046610337,
+  "bins": [
+    {
+      "bin": 0,
+      "lower": 0.0,
+      "upper": 0.1,
+      "count": 0,
+      "mean_confidence": 0.0,
+      "accuracy": 0.0
+    },
+    {
+      "bin": 1,
+      "lower": 0.1,
+      "upper": 0.2,
+      "count": 0,
+      "mean_confidence": 0.0,
+      "accuracy": 0.0
+    },
+    {
+      "bin": 2,
+      "lower": 0.2,
+      "upper": 0.30000000000000004,
+      "count": 15,
+      "mean_confidence": 0.24591095627757337,
+      "accuracy": 0.13333333333333333
+    },
+    {
+      "bin": 3,
+      "lower": 0.30000000000000004,
+      "upper": 0.4,
+      "count": 36,
+      "mean_confidence": 0.36165747811861015,
+      "accuracy": 0.1388888888888889
+    },
+    {
+      "bin": 4,
+      "lower": 0.4,
+      "upper": 0.5,
+      "count": 57,
+      "mean_confidence": 0.43576348446081054,
+      "accuracy": 0.22807017543859648
+    },
+    {
+      "bin": 5,
+      "lower": 0.5,
+      "upper": 0.6000000000000001,
+      "count": 40,
+      "mean_confidence": 0.5699784580920656,
+      "accuracy": 0.275
+    },
+    {
+      "bin": 6,
+      "lower": 0.6000000000000001,
+      "upper": 0.7000000000000001,
+      "count": 38,
+      "mean_confidence": 0.6370181957988773,
+      "accuracy": 0.4473684210526316
+    },
+    {
+      "bin": 7,
+      "lower": 0.7000000000000001,
+      "upper": 0.8,
+      "count": 13,
+      "mean_confidence": 0.7395139385307837,
+      "accuracy": 0.3076923076923077
+    },
+    {
+      "bin": 8,
+      "lower": 0.8,
+      "upper": 0.9,
+      "count": 15,
+      "mean_confidence": 0.839158213701761,
+      "accuracy": 0.26666666666666666
+    },
+    {
+      "bin": 9,
+      "lower": 0.9,
+      "upper": 1.0,
+      "count": 14,
+      "mean_confidence": 0.9476129289360886,
+      "accuracy": 0.21428571428571427
+    }
+  ],
+  "interpretation": "measured; softmax normalization alone is not calibration"
+}

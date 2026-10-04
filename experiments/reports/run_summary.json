@@ -1,0 +1,17 @@
+{
+  "experiment_id": "mistiq-phase4-20261004T102046Z",
+  "seed_list": [
+    42,
+    123
+  ],
+  "dataset": "C:\\ML project\\MISTIQ\\data\\synthetic",
+  "epochs": 100,
+  "split_sizes": {
+    "train": 1061,
+    "validation": 228,
+    "test": 228
+  },
+  "target": "next non-CORRECT mistake category; feature history strictly precedes target timestamp",
+  "results_count": 12,
+  "ablations_count": 16
+}
