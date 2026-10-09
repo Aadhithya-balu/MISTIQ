@@ -99,6 +99,7 @@ The prototype is trustworthy: no leakage, no hardcoding, no DB split, honest syn
 
 ### M2 — investigated; confirmed a data/label ceiling (2026-10-09)
 - **Read-only hyperparameter sweep.** Trained on the temporal train split and selected on the validation split (test reported), over `learning_rate ∈ {0.01, 0.03, 0.05, 0.1, 0.3, 1.0}`, `L2 ∈ {0.001, 0.01, 0.05, 0.2}`, `epochs ∈ {100, 300, 800}`, seeds 42/123. Validation macro-F1 was essentially flat — **0.1292 at the current default up to only 0.1309 at the best config** — and the current default was among the best on the held-out test macro-F1 (0.1385). The plateau shows the limit is the synthetic label distribution, not the optimizer.
+- **Read-only class-weighting probe.** Re-ran weighted cross-entropy with inverse-frequency class weights raised to `alpha ∈ {0, 0.25, 0.5, 0.75, 1.0}` (an established remedy for imbalanced classes). Gains were noise-level and inconsistent across splits: `alpha=0.5` helped test (macro-F1 0.136 → 0.157) but barely validation (0.130 → 0.133), while `alpha=0.75` helped validation (0.144) but not test (0.134). No `alpha` improved both reliably.
 - **Decision — no change.** A model-structure change (non-linear or richer per-class features) would be needed for a material gain, which is out of scope for this hardening pass and would break the Formula-Explorer trace contract and the curated demo. AMPA's real, already-documented advantage is calibration and interpretability; KNN leads raw macro-F1 (0.2028). Reported honestly, no patch applied.
 
 ### Not implemented
