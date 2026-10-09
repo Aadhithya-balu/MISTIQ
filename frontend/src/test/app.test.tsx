@@ -115,7 +115,7 @@ describe('MISTIQ student app', () => {
     expect(screen.getByText(/could not restore your student profile/i)).toBeTruthy()
   })
 
-  it('creates a development student profile without claiming authentication', async () => {
+  it('creates a local profile without claiming authentication', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       if (url.endsWith('/students') && init?.method === 'POST') return jsonResponse(profile, 201)
@@ -127,18 +127,18 @@ describe('MISTIQ student app', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
     render(<MemoryRouter initialEntries={['/login']}><StudentProvider><App /></StudentProvider></MemoryRouter>)
-    expect(await screen.findByText('This local demonstration uses synthetic data only. It does not provide account authentication.')).toBeTruthy()
+    expect(await screen.findByText(/No account, email, or sign-up is required\./)).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Sam Learner' } })
-    fireEvent.click(screen.getByRole('button', { name: /create a local profile/i }))
+    fireEvent.click(screen.getByRole('button', { name: /create my local profile/i }))
     expect(await screen.findByText('Good to see you, Sam.')).toBeTruthy()
     expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith('/students') && init?.method === 'POST')).toBe(true)
   })
 
-  it('opens the seeded synthetic profile from Start Showcase', async () => {
+  it('connects to an existing local profile by student ID', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
       if (url.endsWith('/students/1')) return jsonResponse({ ...profile, id: 1, name: 'Aadhi Demo Student' })
-      if (url.endsWith('/students/1/progress')) return jsonResponse({ student_id: 1, attempt_count: 0, correct_count: 0, accuracy: 0, mistake_count: 0 })
+      if (url.endsWith('/students/1/progress')) return jsonResponse({ student_id: 1, attempt_count: 16, correct_count: 11, accuracy: 0.69, mistake_count: 5 })
       if (url.endsWith('/students/1/mistakes')) return jsonResponse([])
       if (url.endsWith('/predictions/1/latest')) return jsonResponse({ detail: 'Not found' }, 404)
       return jsonResponse({ detail: 'Not found' }, 404)
@@ -146,9 +146,11 @@ describe('MISTIQ student app', () => {
     vi.stubGlobal('fetch', fetchMock)
     render(<MemoryRouter initialEntries={['/login']}><StudentProvider><App /></StudentProvider></MemoryRouter>)
     expect(await screen.findByText(/A learning system that predicts what a student may struggle with next/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /start showcase/i }))
+    expect(screen.queryByText('Showcase Mode')).toBeNull()
+    fireEvent.change(screen.getByLabelText('Student ID'), { target: { value: '1' } })
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }))
     expect(await screen.findByText('Good to see you, Aadhi.')).toBeTruthy()
-    expect(screen.getByText('Showcase Mode')).toBeTruthy()
+    expect(screen.queryByText('Showcase Mode')).toBeNull()
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/students/1'))).toBe(true)
   })
 
