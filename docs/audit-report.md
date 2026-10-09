@@ -89,6 +89,23 @@ The prototype is trustworthy: no leakage, no hardcoding, no DB split, honest syn
 | Full E2E (Student → Question → Attempt → Mistake → Feature update → AMPA prediction → Explanation → Recommendation → New attempt → Updated analytics → Formula trace) | **PASSED** against the real app/artifact/DB; prediction trace verifies **EXACT** with `replay_matches_stored == true`; SQLite confirmed to reflect the interaction |
 | DB hygiene | E2E rows cleaned up; canonical demo state restored (1 student, 14 questions, 16 attempts, 5 mistakes, 12 predictions, 1 recommendation) |
 
+### M1 — attempted, measured, and rolled back (2026-10-09)
+- **Enrichment tried.** The synthetic generator was changed to emit `TIME_PRESSURE` when a wrong attempt's `response_time ≥ 1.5 × estimated_time` (mirroring the live behavior-pressure rule), replacing the old SLOW_ACCURATE 0.10 branch and moving response-time sampling before error-type selection. Regenerated with seed 42, the class grew from **7/1517 (0.46%) to 92 events (~5–8% of mistakes)** — genuinely representable in the corpus.
+- **Measured outcome (full evaluation re-run, seeds 42/123).** `TIME_PRESSURE` still scored **precision 0.00 / recall 0.00** at every seed (test support 22), while aggregate quality *fell*: AMPA macro-F1 **0.128 → 0.101**, accuracy **0.263 → 0.200** (best baseline dropped likewise). The linear multiclass AMPA shares one normalized feature vector across all seven target-class rows, so widening a rare head reallocated label mass without making it separable. The change also flipped the curated demo prediction CONCEPT_CONFUSION → CALCULATION_ERROR.
+- **Decision — reverted.** Regenerated the original corpus (deterministic seed), retrained the artifact **byte-identical to the committed one**, re-ran the evaluation (all metrics identical; only run `timestamp`/`experiment_id` values differ), and re-seeded the demo (CONCEPT_CONFUSION @ 0.3302, recommends Q507). `git status` clean; 65 backend / 16 frontend tests and the production build all pass.
+- **Honest standing:** `TIME_PRESSURE` remains a rare, disclosed class. Making it *predicted* would require a model-structure change (per-class feature isolation) outside this hardening pass; inflating the corpus until it happens would be metric-gaming and was deliberately not done.
+
 ### Not implemented
-- **M1/M2 (TIME_PRESSURE dead class, raw model quality)** — intentionally deferred. They are honest, disclosed limitations; improving them requires offline synthetic-corpus regeneration and artifact retraining, which the user scoped out of Pass 2.
-- Recommendation logic, demo narrative, and copy remain within the audit constraints (no hardcoding, no artifact edits, broadcast over the real pipeline).
+- **M2 (raw model quality)** — intentionally deferred. Honest, disclosed limitation (aggregate AMPA accuracy 0.263, macro-F1 0.128) and out of scope for a prototype hardening pass.
+- Recommendation logic, demo narrative, and copy remain within the audit constraints (no hardcoding, no artifact edits, the real pipeline is the only path).
+```
+
+Now let me also check whether there's any other doc/readme that mentions TIME_PRESSURE being enriched (since I made and reverted - no doc mentions it, so fine).
+
+Also, I should double check: does the M1 line 42 still say "the synthetic generator could be enriched ... so the head is representable and the class can be learned" — that's the original finding, fine as historical. The resolution section now documents the attempt.
+
+Let me verify the edit and then commit. First, confirm git status shows only docs/audit-report.md modified.</think>
+
+<｜DSML｜ calls>
+<｜DSML｜ invoke name="bash">
+<｜DSML｜ parameter name="command" string="true">git status --short
