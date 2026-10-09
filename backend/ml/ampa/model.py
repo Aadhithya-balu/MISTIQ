@@ -218,6 +218,9 @@ class MISTIQAMPA:
         self.student_state.update(interaction)
         return self
 
+    def clear_student(self, student_id) -> bool:
+        return self.student_state.discard(student_id)
+
     def extract_student_features(self, student_id, context=None):
         """Expose class feature rows for auditing; as_of excludes same/future events."""
         context = dict(context or {})

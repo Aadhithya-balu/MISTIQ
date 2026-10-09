@@ -1,14 +1,58 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_ampa_service, get_db
-from app.models import Prediction
+from app.models import Attempt, LearnerState, MistakeEvent, Prediction, Question, Recommendation, Student
 from app.services import research_service
 from app.services.ampa_service import AMPAService
 from app.core.time import utc_isoformat
 
 router = APIRouter(prefix="/research", tags=["research"])
+
+
+@router.get("/database/inspection", summary="Inspect the live database the showcase runs against")
+def database_inspection(session: Session = Depends(get_db)):
+    """Prove the showcase reads/writes the normal local database (mistiq.db)."""
+    student_count = session.scalar(select(func.count()).select_from(Student)) or 0
+    counts = {
+        "students": student_count,
+        "questions": session.scalar(select(func.count()).select_from(Question)) or 0,
+        "attempts": session.scalar(select(func.count()).select_from(Attempt)) or 0,
+        "mistake_events": session.scalar(select(func.count()).select_from(MistakeEvent)) or 0,
+        "predictions": session.scalar(select(func.count()).select_from(Prediction)) or 0,
+        "recommendations": session.scalar(select(func.count()).select_from(Recommendation)) or 0,
+        "learner_states": session.scalar(select(func.count()).select_from(LearnerState)) or 0,
+    }
+    latest_attempt = session.scalar(
+        select(Attempt).order_by(Attempt.timestamp.desc(), Attempt.attempt_id.desc())
+    )
+    latest_mistake = session.scalar(
+        select(MistakeEvent).order_by(MistakeEvent.timestamp.desc(), MistakeEvent.mistake_event_id.desc())
+    )
+    latest_prediction = session.scalar(
+        select(Prediction).order_by(Prediction.created_at.desc(), Prediction.id.desc())
+    )
+    return {
+        "counts": counts,
+        "latest_attempt": {
+            "attempt_id": latest_attempt.attempt_id, "student_id": latest_attempt.student_id,
+            "question_id": latest_attempt.question_id, "correct": latest_attempt.correct,
+            "timestamp": utc_isoformat(latest_attempt.timestamp),
+        } if latest_attempt else None,
+        "latest_mistake": {
+            "mistake_event_id": latest_mistake.mistake_event_id, "student_id": latest_mistake.student_id,
+            "error_type": latest_mistake.error_type.value, "topic": latest_mistake.topic,
+            "timestamp": utc_isoformat(latest_mistake.timestamp),
+        } if latest_mistake else None,
+        "latest_prediction": {
+            "id": latest_prediction.id, "student_id": latest_prediction.student_id,
+            "predicted_error": latest_prediction.predicted_error,
+            "probability": latest_prediction.probability,
+            "status": latest_prediction.status,
+            "created_at": utc_isoformat(latest_prediction.created_at),
+        } if latest_prediction else None,
+    }
 
 
 @router.get("/students/{student_id}/predictions")

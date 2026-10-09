@@ -54,13 +54,15 @@ class AMPAService:
         """Restore per-student history once at startup; learned W/b stay unchanged."""
         if not self.available or self.model is None:
             return
+        self.model.student_state._history.clear()
+        self.model.student_state._attempt_ids.clear()
         with session_factory() as session:
             rows = session.execute(
                 select(Attempt, Question, MistakeEvent)
                 .join(Question, Attempt.question_id == Question.question_id)
                 .outerjoin(MistakeEvent, MistakeEvent.attempt_id == Attempt.attempt_id)
                 .order_by(Attempt.student_id, Attempt.timestamp, Attempt.attempt_id)
-        ).all()
+            ).all()
         for attempt, question, mistake in rows:
             if not attempt.correct and mistake is None:
                 raise ValueError(f"attempt {attempt.attempt_id} is incorrect but has no mistake event")

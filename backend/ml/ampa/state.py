@@ -53,6 +53,12 @@ class StudentStateStore:
             self._attempt_ids.pop(student_id, None)
         return True
 
+    def discard(self, student_id) -> bool:
+        """Forget one student's whole history, e.g. after its stored rows are deleted."""
+        removed = bool(self._history.pop(student_id, None))
+        self._attempt_ids.pop(student_id, None)
+        return removed
+
 
 def _timestamp(value) -> datetime:
     parsed = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))

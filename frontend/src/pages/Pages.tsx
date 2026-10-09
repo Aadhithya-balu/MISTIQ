@@ -10,6 +10,7 @@ import { mistakeLabels } from '../constants/errorLabels'
 import { mistakeTrendText, performanceTrendText } from '../constants/analyticsLanguage'
 import { ApiError } from '../api/client'
 import { getPredictionTrace, getResearchAblations, getResearchCalibration, getResearchConfusion, getResearchCurves, getResearchColdStart, getResearchEvaluation, getResearchModel, getResearchPredictions, getResearchSeeds } from '../api/research'
+import { getDatabaseInspection, getShowcaseStatus, resetShowcase, seedShowcase, type DatabaseInspection, type ShowcaseStatus } from '../api/showcase'
 import { useStudent } from '../context/StudentContext'
 import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '../components'
 import type { AttemptSubmission, ErrorType, LearnerState, MistakeEvent, MistakeSummary, OptionKey, Prediction, PredictionExplanation, Progress, Question, RecommendedPractice } from '../types/entities'
@@ -205,7 +206,7 @@ export function ProfilePage() {
   return <><PageHeader title="Your learning profile" description="A gentle snapshot of patterns in your practice. These are learning signals, not labels." />{loading ? <LoadingState label="Reading your learning history…" /> : error ? <ErrorState message={error} /> : !state ? <Card><EmptyState title="Your profile will grow with practice" description="Start with a few questions. MISTIQ will build a profile from your actual learning history." /><Link className="button" to="/practice">Start practicing <span aria-hidden="true">→</span></Link></Card> : <><Card className="profile-intro"><div className="avatar avatar-large">{student?.name.slice(0, 1).toUpperCase()}</div><div><div className="card-kicker">LEARNING PROFILE</div><h2>{student?.name}</h2><p>{state.attempt_count} attempts · {state.relevant_mistake_count} review moments</p></div></Card><div className="profile-measures">{profileMeasures.map(measure => { const raw = state[measure.key]; const score = Math.round(Math.max(0, Math.min(1, measure.inverse ? 1 - raw : raw)) * 100); return <Card key={measure.key}><div className="measure-heading"><h3>{measure.label}</h3><strong>{score}%</strong></div><div className="measure-track" role="progressbar" aria-label={measure.label} aria-valuenow={score} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${score}%` }} /></div><p>{measure.description}</p></Card> })}</div></>}</>
 }
 
-export function ResearchPage({ mode }: { mode: 'overview' | 'formula' | 'evaluation' }) {
+export function ResearchPage({ mode }: { mode: 'overview' | 'formula' | 'evaluation' | 'formula-explorer' | 'analytics' | 'predictions' | 'comparisons' | 'showcase' }) {
   const [model, setModel] = useState<Record<string, any> | null>(null)
   const [evaluation, setEvaluation] = useState<Record<string, any> | null>(null)
   const [ablations, setAblations] = useState<Record<string, any> | null>(null)
@@ -222,8 +223,30 @@ export function ResearchPage({ mode }: { mode: 'overview' | 'formula' | 'evaluat
   const [predictions, setPredictions] = useState<Record<string, any>[]>([])
   const [predictionId, setPredictionId] = useState('')
   const [trace, setTrace] = useState<Record<string, any> | null>(null)
+  const [showcaseStatus, setShowcaseStatus] = useState<ShowcaseStatus | null>(null)
+  const [inspection, setInspection] = useState<DatabaseInspection | null>(null)
+  const [showcaseBusy, setShowcaseBusy] = useState(false)
+  const [showcaseNotice, setShowcaseNotice] = useState('')
   const [error, setError] = useState('')
+  const { student } = useStudent()
   useEffect(() => { getResearchModel().then(setModel).catch(reason => setError(errorMessage(reason))) }, [])
+  useEffect(() => {
+    if (mode !== 'formula' || !student || predictionId) return
+    let active = true
+    getLatestPrediction(student.id)
+      .then(prediction => { if (active) { setPredictionId(String(prediction.id)); return getPredictionTrace(prediction.id) } })
+      .then(trace => { if (active && trace) setTrace(trace) })
+      .catch(() => undefined)
+    return () => { active = false }
+  }, [mode, student?.id])
+  useEffect(() => {
+    if (mode !== 'showcase') return
+    let active = true
+    Promise.all([getShowcaseStatus(), getDatabaseInspection()])
+      .then(([status, query]) => { if (active) { setShowcaseStatus(status); setInspection(query) } })
+      .catch(reason => { if (active) setError(errorMessage(reason)) })
+    return () => { active = false }
+  }, [mode])
   useEffect(() => {
     if (mode !== 'evaluation') return
     Promise.all([getResearchEvaluation(), getResearchAblations(), getResearchSeeds(), getResearchCurves(), getResearchColdStart()])
@@ -242,20 +265,37 @@ export function ResearchPage({ mode }: { mode: 'overview' | 'formula' | 'evaluat
     catch (reason) { setError(errorMessage(reason)) }
   }
   const loadTrace = async () => { if (!predictionId) return; setError(''); try { setTrace(await getPredictionTrace(Number(predictionId))) } catch (reason) { setError(errorMessage(reason)) } }
-  const titles = { overview: ['Research / Model Lab', 'Implementation and saved model details from this project.'], formula: ['Formula Explorer', 'Reconstruct a stored prediction from its attempt history and saved AMPA parameters.'], evaluation: ['Evaluation', 'Phase 4 evaluation artifacts, read directly from experiment outputs.'] } as const
+  const runShowcaseAction = async (action: 'reset' | 'seed') => {
+    setShowcaseBusy(true); setShowcaseNotice(''); setError('')
+    try {
+      if (action === 'reset') { await resetShowcase(); setShowcaseNotice('Reset complete. The demo student has no practice history until it is seeded.') }
+      else { await seedShowcase(); setShowcaseNotice('Seed complete. The demo student history was replayed through the live AMPA pipeline.') }
+      const [status, query] = await Promise.all([getShowcaseStatus(), getDatabaseInspection()])
+      setShowcaseStatus(status); setInspection(query)
+    } catch (reason) { setError(errorMessage(reason)) }
+    finally { setShowcaseBusy(false) }
+  }
+  const titles = { overview: ['Research / Model Lab', 'Implementation and saved model details from this project.'], formula: ['Formula Explorer', 'Reconstruct a stored prediction from its attempt history and saved AMPA parameters.'], 'formula-explorer': ['Formula Explorer', 'Reconstruct a stored prediction from its attempt history and saved AMPA parameters.'], analytics: ['Analytics', 'Advanced analytics artifacts.'], predictions: ['Predictions', 'Research prediction view.'], comparisons: ['Comparisons', 'Comparisons of models/approaches.'], evaluation: ['Evaluation', 'Phase 4 evaluation artifacts, read directly from experiment outputs.'], showcase: ['Showcase / Database Inspector', 'Live view of the normal local database the showcase runs against.'] } as const
   const [title, description] = titles[mode]
   const metricKeys = ['accuracy', 'macro_precision', 'macro_recall', 'macro_f1', 'weighted_f1', 'log_loss', 'top2_accuracy', 'top3_accuracy', 'brier_score', 'ece']
   const fmt = (v: unknown) => typeof v === 'number' ? v.toFixed(4) : String(v ?? '—')
   return <><PageHeader title={title} description={description} />
-    <div className="research-links research-tabs"><Link to="/research">Research overview</Link><Link to="/research/formula">Formula explorer</Link><Link to="/research/evaluation">Evaluation</Link></div>
+    <div className="research-links research-tabs"><Link to="/research">Research overview</Link><Link to="/research/showcase">Showcase / Database</Link><Link to="/research/formula-explorer">Formula explorer</Link><Link to="/research/evaluation">Evaluation</Link></div>
     {error && <p className="error research-error">{error}</p>}
     {mode === 'overview' && <div className="research-grid">
       <Card className="research-wide"><div className="card-kicker">MISTIQ-AMPA · {model?.model_version ?? '…'}</div><h2>Adaptive Mistake Propagation Algorithm</h2><p>Predicts a likely next mistake category from sequential learning behavior. It is a project-specific custom sequential mistake-prediction framework, not a claimed universal machine-learning paradigm.</p><div className="research-facts"><span>Features<strong>{model?.feature_count ?? '—'}</strong></span><span>Classes<strong>{model?.class_count ?? '—'}</strong></span><span>Training<strong>{model?.training_status ?? '—'}</strong></span><span>Evaluation<strong>{model?.evaluation_status ?? '—'}</strong></span></div></Card>
       <Card className="research-wide"><div className="card-kicker">IMPLEMENTED PIPELINE</div><div className="research-pipeline">{['Student attempts', 'Mistake events', 'Mistake memory', 'Feature engineering', 'Risk representation', 'AMPA scores', 'Stable softmax', 'Prediction and explanation', 'Recommendation'].map((item, i) => <div key={item}><span>{String(i + 1).padStart(2, '0')}</span>{item}</div>)}</div></Card>
       <Card className="research-wide"><div className="card-kicker">FEATURES FROM THE MODEL IMPLEMENTATION</div><div className="research-feature-grid">{(model?.feature_definitions ?? []).map((feature: Record<string, any>) => <article key={feature.name}><div><strong>{feature.label ?? feature.name.replaceAll('_', ' ')}</strong><code>{feature.symbol}</code></div><p>{feature.description}</p><small>Range {feature.range}. {feature.role}</small></article>)}</div><p className="research-note">The model transforms learning stability to instability (1 − stability) before standardization and scoring. Student profile labels are computational learning-history signals, not psychological attributes.</p></Card>
     </div>}
+    {mode === 'showcase' && <div className="research-stack">
+      <Card><div className="card-kicker">SHOWCASE MODE · SYNTHETIC STUDENT</div><h2>Aadhi Demo Student</h2><p>All dashboard analytics, predictions and recommendations come from the live pipeline over the normal local database — not from hardcoded showcase values. Reset clears the demo history; seed replays it through the same <code>POST /attempts</code> path the app uses.</p><div className="research-facts"><span>Status<strong>{showcaseStatus?.seeded ? 'Seeded' : 'Empty'}</strong></span><span>Attempts<strong>{showcaseStatus?.attempt_count ?? '—'}</strong></span><span>Mistakes<strong>{showcaseStatus?.mistake_count ?? '—'}</strong></span><span>Prediction<strong>{showcaseStatus?.latest_prediction_error ?? '—'}</strong></span></div><div className="research-form"><button className="button" onClick={() => runShowcaseAction('seed')} disabled={showcaseBusy}>{showcaseBusy ? 'Working…' : 'Re-seed showcase'}</button><button className="button button-secondary" onClick={() => runShowcaseAction('reset')} disabled={showcaseBusy}>Reset demo history</button></div>{showcaseNotice && <p className="research-note">{showcaseNotice}</p>}</Card>
+      <div className="research-split">
+        <Card><div className="card-kicker">LIVE DATABASE PROOF</div><p>Row counts and the latest writes in the normal local database (<code>mistiq.db</code>) that powers this session.</p>{inspection?.counts ? <div className="research-facts"><span>Students<strong>{inspection.counts.students}</strong></span><span>Questions<strong>{inspection.counts.questions}</strong></span><span>Attempts<strong>{inspection.counts.attempts}</strong></span><span>Predictions<strong>{inspection.counts.predictions}</strong></span><span>Recommendations<strong>{inspection.counts.recommendations}</strong></span><span>Mistake events<strong>{inspection.counts.mistake_events}</strong></span></div> : <p className="analytics-empty">Inspecting…</p>}</Card>
+        <Card><div className="card-kicker">LATEST LIVE WRITES</div>{inspection?.latest_attempt ? <ul className="insight-list"><li><div><strong>Attempt #{inspection.latest_attempt.attempt_id}</strong><span>Question {inspection.latest_attempt.question_id} · {inspection.latest_attempt.correct ? 'correct' : 'incorrect'}</span><small>{new Date(inspection.latest_attempt.timestamp).toLocaleString()}</small></div></li><li><div><strong>Mistake #{inspection.latest_mistake?.mistake_event_id}</strong><span>{inspection.latest_mistake?.topic} · {mistakeLabels[inspection.latest_mistake?.error_type as ErrorType] ?? inspection.latest_mistake?.error_type}</span><small>{inspection.latest_mistake ? new Date(inspection.latest_mistake.timestamp).toLocaleString() : '—'}</small></div></li><li><div><strong>Prediction #{inspection.latest_prediction?.id}</strong><span>{inspection.latest_prediction?.predicted_error} · {((inspection.latest_prediction?.probability ?? 0) * 100).toFixed(1)}% · {inspection.latest_prediction?.status}</span><small>{inspection.latest_prediction ? new Date(inspection.latest_prediction.created_at).toLocaleString() : '—'}</small></div></li></ul> : <p className="analytics-empty">No writes recorded yet.</p>}</Card>
+      </div>
+    </div>}
     {mode === 'formula' && <div className="research-stack">
-      <Card><div className="card-kicker">SELECT HISTORICAL CONTEXT</div><form className="research-form" onSubmit={loadPredictions}><label>Student ID<input value={studentId} onChange={e => setStudentId(e.target.value)} required type="number" min="1" /></label><button className="button" type="submit">Load predictions</button></form>{predictions.length > 0 && <div className="research-form"><label>Prediction<select value={predictionId} onChange={e => setPredictionId(e.target.value)}>{predictions.map(p => <option value={p.id} key={p.id}>#{p.id} · {p.prediction} · {p.timestamp}</option>)}</select></label><button className="button" onClick={loadTrace}>Trace calculation</button></div>}{predictions.length === 0 && studentId && <p className="research-note">Enter a student ID and load stored predictions.</p>}</Card>
+      <Card><div className="card-kicker">SELECT HISTORICAL CONTEXT</div><form className="research-form" onSubmit={loadPredictions}><label>Student ID<input value={studentId} onChange={e => setStudentId(e.target.value)} required type="number" min="1" /></label><button className="button" type="submit">Load predictions</button></form>{predictions.length > 0 && <div className="research-form"><label>Prediction<select value={predictionId} onChange={e => setPredictionId(e.target.value)}>{predictions.map(p => <option value={p.id} key={p.id}>#{p.id} · {p.prediction} · {p.timestamp}</option>)}</select></label><button className="button" onClick={loadTrace}>Trace calculation</button></div>}{predictions.length === 0 && studentId && <p className="research-note">Enter a student ID and load stored predictions.</p>}{!studentId && predictionId && <p className="research-note">Loaded the latest stored prediction for the active student ({student?.name}). You can look up another student's predictions above.</p>}</Card>
       {model && <Card><div className="card-kicker">IMPLEMENTED FEATURE PARAMETERS</div><p>Memory: recency weight exp(−λ · age days), λ={fmt(model.hyperparameters.decay_rate)}; repetition A(N)=1+α log(1+N), α={fmt(model.hyperparameters.repetition_alpha)}; bounded memory scale={fmt(model.hyperparameters.memory_scale)}.</p><p>Momentum compares two windows of k={model.hyperparameters.momentum_window} interactions with scale={fmt(model.hyperparameters.momentum_scale)}. Scoring normalization and saved training parameters come from model version {model.model_version}.</p></Card>}
       {trace && <><Card><div className="card-kicker">FEATURE SNAPSHOT</div><p>Context: {trace.context.topic} / {trace.context.subtopic ?? '—'} · difficulty {trace.context.difficulty} · attempts replayed {trace.attempt_count}. Raw history features and standardized scoring values are shown separately.</p><div className="research-table-wrap"><table className="research-table"><thead><tr><th>Class</th>{(model?.features ?? []).map((f: string) => <th key={f}>{f}</th>)}</tr></thead><tbody>{trace.classes.map((label: string) => <tr key={label} className={trace.prediction.predicted_error === label ? 'trace-predicted' : ''}><th>{label}</th>{(model?.features ?? []).map((f: string) => <td key={f}>{fmt(trace.scoring_features_by_class[label][f])}</td>)}</tr>)}</tbody></table></div></Card>
         <Card><div className="card-kicker">LEARNED WEIGHTS AND BIAS · {trace.model_version}</div><div className="research-table-wrap"><table className="research-table"><thead><tr><th>Class</th>{(model?.features ?? []).map((f: string) => <th key={f}>{f}</th>)}<th>Bias</th></tr></thead><tbody>{trace.classes.map((label: string, i: number) => <tr key={label} className={trace.prediction.predicted_error === label ? 'trace-predicted' : ''}><th>{label}</th>{(model?.features ?? []).map((_: string, j: number) => <td key={j}>{fmt(trace.weights[i][j])}</td>)}<td>{fmt(trace.bias[i])}</td></tr>)}</tbody></table></div></Card>
@@ -274,3 +314,4 @@ export function ResearchPage({ mode }: { mode: 'overview' | 'formula' | 'evaluat
     </div>}
   </>
 }
+

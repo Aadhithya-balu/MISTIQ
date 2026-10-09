@@ -66,3 +66,8 @@ def get_repeated_mistakes(student_id: int, session: Session = Depends(get_db)):
 @router.get("/mistakes/{student_id}/confusions", summary="Return observed concept confusion pairs")
 def get_concept_confusions(student_id: int, session: Session = Depends(get_db)):
     return _mistake_analytics(student_id, session)["confusions"]
+
+@router.get("/students", response_model=list[StudentRead], summary="List students")
+def list_students(session: Session = Depends(get_db)):
+    from sqlalchemy import select
+    return list(session.scalars(select(Student).order_by(Student.id)))

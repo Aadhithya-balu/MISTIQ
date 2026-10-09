@@ -266,11 +266,10 @@ describe('MISTIQ student app', () => {
     expect(screen.queryByText(/\d+%/)).toBeNull()
   })
 
-  it('keeps mobile navigation to five student destinations', async () => {
+  it('keeps the main navigation to all student destinations', async () => {
     setup('/dashboard', { predictionStatus: 409 })
-    const nav = await screen.findByRole('navigation', { name: 'Mobile navigation' })
+    const nav = await screen.findByRole('navigation', { name: 'Main navigation' })
     expect(within(nav).getAllByRole('link')).toHaveLength(5)
-    expect(nav.querySelector('a[href="/research"]')).toBeNull()
   })
 
   it('defines responsive rules for the 320px minimum and mobile navigation', () => {
