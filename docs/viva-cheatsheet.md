@@ -40,7 +40,7 @@
 
 **How are predictions explained?** The trace shows actual history features, standardized scoring inputs, learned weights, feature contributions, class scores, softmax probabilities, and the stored prediction.
 
-**How does recommendation work?** It ranks existing questions using learning need, mistake relevance, difficulty fit, novelty, and retention value with configured weights 0.35, 0.25, 0.20, 0.10, and 0.10. Cold-start practice is explicitly non-personalized.
+**How does recommendation work?** It ranks existing questions using learning need, mistake relevance, difficulty fit, novelty, and retention value with configured weights 0.35, 0.25, 0.20, 0.10, and 0.10. The same history-grounded ranking runs during AMPA cold start, but it is labeled starter practice and carries no prediction reference until a `NORMAL_OPERATION` prediction exists.
 
 ## Limitations
 

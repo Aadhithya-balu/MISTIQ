@@ -26,46 +26,12 @@ class RecommendationService:
         total = sum(self.weights.values())
         self.weights = {key: value / total for key, value in self.weights.items()}
 
-    def recommend_next(self, session: Session, student_id: int) -> Recommendation | None:
-        student = session.get(Student, student_id)
-        if student is None:
-            return None
-        pending = session.scalar(
-            select(Recommendation).where(
-                Recommendation.student_id == student_id,
-                Recommendation.completed_at.is_(None),
-                Recommendation.question_id.is_not(None),
-            ).order_by(Recommendation.created_at.desc(), Recommendation.id.desc())
-        )
-        if pending is not None and session.get(Question, pending.question_id) is not None:
-            return pending
-        questions = session.scalars(select(Question).order_by(Question.question_id)).all()
-        if not questions:
-            return None
-        attempts = session.scalars(select(Attempt).where(Attempt.student_id == student_id).order_by(Attempt.timestamp, Attempt.attempt_id)).all()
-        mistakes = session.scalars(select(MistakeEvent).where(MistakeEvent.student_id == student_id).order_by(MistakeEvent.timestamp, MistakeEvent.mistake_event_id)).all()
-        counts = Counter(attempt.question_id for attempt in attempts)
-        latest_prediction = session.scalar(
-            select(Prediction).where(Prediction.student_id == student_id)
-            .order_by(Prediction.created_at.desc(), Prediction.id.desc())
-        )
-        reliable_prediction = latest_prediction is not None and latest_prediction.status == "NORMAL_OPERATION"
-        unseen = [question for question in questions if counts[question.question_id] == 0]
-        if unseen:
-            questions = unseen
-        if not reliable_prediction:
-            # During AMPA cold start, offer deterministic, not personalized practice.
-            question = min(questions, key=lambda item: (counts[item.question_id], item.question_id))
-            recommendation = Recommendation(
-                student_id=student_id, prediction_id=None, question_id=question.question_id,
-                type="STARTER_PRACTICE",
-                reason="A starter question while MISTIQ gathers enough practice history for a reliable prediction.",
-                score=None, score_components=None, created_at=datetime.now(timezone.utc),
-            )
-            session.add(recommendation)
-            session.flush()
-            return recommendation
-        recent_mistakes = mistakes[-20:]
+    def _rank_candidates(self, questions, attempts, recent_mistakes, counts) -> tuple[Question, dict, float]:
+        """Score every candidate question and return the winner with its components.
+
+        The five score components are non-negative and history-grounded; the result is a
+        reproducible selection score, not a model prediction.
+        """
         question_by_id = {question.question_id: question for question in questions}
         success_by_difficulty: dict[int, list[bool]] = {}
         for attempt in attempts:
@@ -96,6 +62,37 @@ class RecommendationService:
             # Stable tie-breaking gives reproducible selection from the same DB snapshot.
             ranked.append((score, -counts[question.question_id], -question.question_id, question, components))
         score, _, _, question, components = max(ranked, key=lambda row: row[:3])
+        return question, components, score
+
+    def recommend_next(self, session: Session, student_id: int) -> Recommendation | None:
+        student = session.get(Student, student_id)
+        if student is None:
+            return None
+        pending = session.scalar(
+            select(Recommendation).where(
+                Recommendation.student_id == student_id,
+                Recommendation.completed_at.is_(None),
+                Recommendation.question_id.is_not(None),
+            ).order_by(Recommendation.created_at.desc(), Recommendation.id.desc())
+        )
+        if pending is not None and session.get(Question, pending.question_id) is not None:
+            return pending
+        questions = session.scalars(select(Question).order_by(Question.question_id)).all()
+        if not questions:
+            return None
+        attempts = session.scalars(select(Attempt).where(Attempt.student_id == student_id).order_by(Attempt.timestamp, Attempt.attempt_id)).all()
+        mistakes = session.scalars(select(MistakeEvent).where(MistakeEvent.student_id == student_id).order_by(MistakeEvent.timestamp, MistakeEvent.mistake_event_id)).all()
+        counts = Counter(attempt.question_id for attempt in attempts)
+        latest_prediction = session.scalar(
+            select(Prediction).where(Prediction.student_id == student_id)
+            .order_by(Prediction.created_at.desc(), Prediction.id.desc())
+        )
+        reliable_prediction = latest_prediction is not None and latest_prediction.status == "NORMAL_OPERATION"
+        unseen = [question for question in questions if counts[question.question_id] == 0]
+        if unseen:
+            questions = unseen
+        recent_mistakes = mistakes[-20:]
+        question, components, score = self._rank_candidates(questions, attempts, recent_mistakes, counts)
         reasons = sorted(components.items(), key=lambda item: item[1] * self.weights[item[0]], reverse=True)
         strongest = reasons[0][0]
         reason_copy = {
@@ -105,11 +102,21 @@ class RecommendationService:
             "novelty": "This question gives you a fresh opportunity to practice.",
             "retention_value": f"A new question on {question.subtopic or question.topic} can help you revisit this topic.",
         }
-        recommendation = Recommendation(
-            student_id=student_id, prediction_id=latest_prediction.id if latest_prediction else None,
-            question_id=question.question_id, type="PRACTICE_QUESTION", score=score,
-            score_components=components, reason=reason_copy[strongest], created_at=datetime.now(timezone.utc),
-        )
+        if reliable_prediction:
+            recommendation = Recommendation(
+                student_id=student_id, prediction_id=latest_prediction.id,
+                question_id=question.question_id, type="PRACTICE_QUESTION",
+                reason=reason_copy[strongest], score=score,
+                score_components=components, created_at=datetime.now(timezone.utc),
+            )
+        else:
+            # Under AMPA cold start there is no reliable prediction, so the same
+            # history-grounded ranking still offers deterministic, personalized practice.
+            recommendation = Recommendation(
+                student_id=student_id, prediction_id=None, question_id=question.question_id,
+                type="STARTER_PRACTICE", reason=reason_copy[strongest], score=score,
+                score_components=components, created_at=datetime.now(timezone.utc),
+            )
         session.add(recommendation)
         session.flush()
         return recommendation

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
@@ -178,7 +179,14 @@ def test_recommendation_cold_start_and_completion_loop_uses_real_question_and_am
         assert next_step.json()["cold_start"] is True
         assert next_step.json()["question"]["question_id"] == recommendation["question_id"] == 1
         assert recommendation["type"] == "STARTER_PRACTICE"
-        assert recommendation["score"] is None and recommendation["score_components"] is None
+        assert recommendation["reason"]
+        assert recommendation["score"] == pytest.approx(
+            0.35 * recommendation["score_components"]["learning_need"]
+            + 0.25 * recommendation["score_components"]["mistake_relevance"]
+            + 0.20 * recommendation["score_components"]["difficulty_fit"]
+            + 0.10 * recommendation["score_components"]["novelty"]
+            + 0.10 * recommendation["score_components"]["retention_value"]
+        )
         assert client.get(f"/api/recommendations/{student_id}").json()[0]["id"] == recommendation["id"]
         assert client.get(f"/api/recommendations/{student_id}/next").json()["recommendation"]["id"] == recommendation["id"]
 
