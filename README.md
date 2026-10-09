@@ -70,19 +70,13 @@ python -m backend.ml.datasets.synthetic_generator --seed 42
 python -m scripts.train_ampa_artifact --seed 42
 ```
 
-Run the backend from its directory so the default relative SQLite URL uses `backend/mistiq.db`:
+Start the API and frontend together from the repository root:
 
 ```powershell
-cd backend
-python -m uvicorn app.main:app --reload
+npm run dev:all
 ```
 
-Run the frontend in a second terminal:
-
-```powershell
-cd frontend
-npm run dev
-```
+The API runs `python -m uvicorn app.main:app --app-dir backend --reload` on `http://127.0.0.1:8000` and the Vite dev server on its default port; both stop together with `Ctrl+C`. You can also run them in separate terminals from `backend/` and `frontend/`. The default SQLite database is always `backend/mistiq.db`, independent of the current directory.
 
 The Vite development server proxies `/api` to `http://127.0.0.1:8000`. Configure `VITE_API_URL` in `frontend/.env` when using another API URL. Backend settings use process environment variables; `.env.example` lists names and safe local defaults but is not automatically loaded by the backend.
 
@@ -110,11 +104,16 @@ Results are written beneath `experiments/`; they are generated artifacts and can
 
 ## API and Research Lab
 
-Backend health is available at `/health`; OpenAPI docs are at `/docs`. Main API resources use the `/api` prefix. Research routes are under `/api/research`, while the student research pages are `/research`, `/research/formula`, and `/research/evaluation`. Research parameter and student trace endpoints are not protected by roles in this development project.
+Backend health is available at `/health`; OpenAPI docs are at `/docs`. Main API resources use the `/api` prefix. Research routes are under `/api/research`, while the student research pages are `/research`, `/research/formula-explorer`, and `/research/analytics`. Research parameter and student trace endpoints are not protected by roles in this development project.
 
 ## College Showcase
 
-The showcase is a local synthetic-data demo using the real API and MISTIQ-AMPA pipeline. From the repository root, prepare its isolated database with `python scripts/setup_showcase.py`; rerun `python scripts/reset_showcase.py` followed by setup to reset it. Start FastAPI from `backend/` after setting `$env:DATABASE_URL = "sqlite:///../data/showcase/showcase.db"`, then start Vite from `frontend/` with `npm run dev`. Choose **Start Showcase** to open the seeded demo student. Walk through Dashboard → Practice → Mistakes/Progress → Research → Formula Explorer → Evaluation. See the [showcase guide](docs/showcase-guide.md), [seven-minute script](docs/showcase-script.md), and [viva cheatsheet](docs/viva-cheatsheet.md) for the complete presentation flow.
+The project ships with a local demo learner (`Student ID 1`) built from real question, attempt, feature, prediction, and recommendation records in `backend/mistiq.db`. To see a fully populated profile before creating your own:
+
+- Open the running app and reconnect with Student ID 1 (**Continue**), or
+- From the Research Lab → **Database**, use **Seed demo session** to create it on demand and **Reset demo history** to clear it.
+
+You can also prepare it from the command line with `python scripts/setup_showcase.py` and clear it with `python scripts/reset_showcase.py`. Walk through Dashboard → Practice → Mistakes/Progress → Research → Formula Explorer → Evaluation. See the [viva cheatsheet](docs/viva-cheatsheet.md) for project Q&A and the [demo guide](docs/demo-guide.md) for the in-memory end-to-end flow.
 
 ## Tests
 

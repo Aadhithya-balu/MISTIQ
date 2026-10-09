@@ -1,0 +1,16 @@
+{
+  "name": "mistiq",
+  "private": true,
+  "version": "2.0.0",
+  "description": "MISTIQ — Mistake Intelligence & Sequential Prediction (FastAPI + React)",
+  "scripts": {
+    "dev:all": "concurrently -k -n API,WEB -c blue,green \"python -m uvicorn app.main:app --app-dir backend --reload\" \"npm --prefix frontend run dev\"",
+    "test": "concurrently -n BACKEND,WEB -c blue,green \"python -m pytest tests -q -p no:cacheprovider\" \"npm --prefix frontend run test\"",
+    "test:backend": "python -m pytest tests -q -p no:cacheprovider",
+    "test:frontend": "npm --prefix frontend run test",
+    "build": "npm --prefix frontend run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

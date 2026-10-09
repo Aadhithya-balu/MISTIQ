@@ -3,10 +3,11 @@ import json
 from pathlib import Path
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_DATABASE_URL = f"sqlite:///{(BACKEND_ROOT / 'mistiq.db').as_posix()}"
 
 
 class Settings:
-    database_url: str = os.getenv("DATABASE_URL", "sqlite:///./mistiq.db")
+    database_url: str = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
     ampa_model_path: Path = Path(os.getenv("MISTIQ_AMPA_MODEL_PATH", str(BACKEND_ROOT / "ml" / "artifacts" / "ampa.npz")))
     prediction_top_k: int = max(1, int(os.getenv("MISTIQ_PREDICTION_TOP_K", "3")))
     explanation_contribution_threshold: float = max(0.0, float(os.getenv("MISTIQ_EXPLANATION_CONTRIBUTION_THRESHOLD", "0.05")))
