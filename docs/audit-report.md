@@ -78,6 +78,8 @@ The prototype is trustworthy: no leakage, no hardcoding, no DB split, honest syn
 - **M3 (untested scoring) — RESOLVED** by the above unit/integration coverage.
 - **L1 — VERIFIED.** The demo explanation renders non-empty `evidence` (asserted in the showcase integration test); no fallback needed.
 - **Docs** `prediction-explanation-recommendation.md` and `viva-cheatsheet.md` updated to describe the history-grounded cold-start ranking honestly.
+- **Mistakes-page copy (improvement 6) — DONE.** The mistake distribution now states that only patterns present in the learner's recorded practice are shown and that very rare categories can be absent in a short session.
+- **Showcase/threshold docs (improvement 10) — DONE.** The ≥30-attempt `NORMAL_OPERATION` threshold and the demo's starter-practice behavior are documented in `prediction-explanation-recommendation.md`, `backend-ml-integration.md`, and `viva-cheatsheet.md`.
 
 ### Pass 3 verification (all executed, exact results)
 | Check | Result |
