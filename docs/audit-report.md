@@ -98,14 +98,3 @@ The prototype is trustworthy: no leakage, no hardcoding, no DB split, honest syn
 ### Not implemented
 - **M2 (raw model quality)** — intentionally deferred. Honest, disclosed limitation (aggregate AMPA accuracy 0.263, macro-F1 0.128) and out of scope for a prototype hardening pass.
 - Recommendation logic, demo narrative, and copy remain within the audit constraints (no hardcoding, no artifact edits, the real pipeline is the only path).
-```
-
-Now let me also check whether there's any other doc/readme that mentions TIME_PRESSURE being enriched (since I made and reverted - no doc mentions it, so fine).
-
-Also, I should double check: does the M1 line 42 still say "the synthetic generator could be enriched ... so the head is representable and the class can be learned" — that's the original finding, fine as historical. The resolution section now documents the attempt.
-
-Let me verify the edit and then commit. First, confirm git status shows only docs/audit-report.md modified.</think>
-
-<｜DSML｜ calls>
-<｜DSML｜ invoke name="bash">
-<｜DSML｜ parameter name="command" string="true">git status --short
