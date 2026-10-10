@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { getLearnerState, getMistakeSummary, getMistakes, getProgress } from '../api/students'
 import { getQuestions } from '../api/questions'
 import { submitAttempt } from '../api/attempts'
@@ -274,7 +274,7 @@ export function ResearchPage({ mode }: { mode: 'overview' | 'formula' | 'evaluat
   const metricKeys = ['accuracy', 'macro_precision', 'macro_recall', 'macro_f1', 'weighted_f1', 'log_loss', 'top2_accuracy', 'top3_accuracy', 'brier_score', 'ece']
   const fmt = (v: unknown) => typeof v === 'number' ? v.toFixed(4) : String(v ?? '—')
   return <><PageHeader title={title} description={description} />
-    <div className="research-links research-tabs"><Link to="/research">Research overview</Link><Link to="/research/showcase">Database</Link><Link to="/research/formula-explorer">Formula explorer</Link><Link to="/research/evaluation">Evaluation</Link></div>
+    <div className="research-links research-tabs"><NavLink to="/research" end>Research overview</NavLink><NavLink to="/research/showcase">Database</NavLink><NavLink to="/research/formula-explorer">Formula explorer</NavLink><NavLink to="/research/evaluation">Evaluation</NavLink></div>
     {error && <p className="error research-error">{error}</p>}
     {mode === 'overview' && <div className="research-grid">
       <Card className="research-wide"><div className="card-kicker">MISTIQ-AMPA · {model?.model_version ?? '…'}</div><h2>Adaptive Mistake Propagation Algorithm</h2><p>Predicts a likely next mistake category from sequential learning behavior. It is a project-specific custom sequential mistake-prediction framework, not a claimed universal machine-learning paradigm.</p><div className="research-facts"><span>Features<strong>{model?.feature_count ?? '—'}</strong></span><span>Classes<strong>{model?.class_count ?? '—'}</strong></span><span>Training<strong>{model?.training_status ?? '—'}</strong></span><span>Evaluation<strong>{model?.evaluation_status ?? '—'}</strong></span></div></Card>

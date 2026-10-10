@@ -14,10 +14,9 @@ export default function App() {
     <Route path="/profile" element={<ProfilePage />} />
 <Route path="/research" element={<ResearchPage mode="overview" />} />
     <Route path="/research/showcase" element={<ResearchPage mode="showcase" />} />
-    <Route path="/research/formula-explorer" element={<ResearchPage mode="formula-explorer" />} />
-    <Route path="/research/analytics" element={<ResearchPage mode="analytics" />} />
-    <Route path="/research/predictions" element={<ResearchPage mode="predictions" />} />
-    <Route path="/research/comparisons" element={<ResearchPage mode="comparisons" />} />
+    <Route path="/research/formula-explorer" element={<ResearchPage mode="formula" />} />
+    <Route path="/research/evaluation" element={<ResearchPage mode="evaluation" />} />
+    <Route path="*" element={<Navigate to="/dashboard" replace />} />
   </Route>
   </Routes>
 }
