@@ -112,22 +112,23 @@ def _generate_questions(config: GeneratorConfig, rng: random.Random) -> list[dic
         distractors = [choice for choice in "ABCD" if choice != correct]
         mappings = {
             distractors[0]: "CONCEPT_CONFUSION",
-            distractors[1]: rng.choice(("CALCULATION_ERROR", "PROCEDURE_ERROR")),
+            distractors[1]: _secondary_error(topic),
             distractors[2]: "CARELESS_ERROR",
         }
         options = {letter: f"Synthetic answer choice {letter}" for letter in "ABCD"}
         options[correct] = f"Synthetic answer representing {topic}"
         options[distractors[0]] = f"A concept associated with {paired_topic}"
+        difficulty = rng.choices((1, 2, 3, 4, 5), weights=(10, 20, 35, 23, 12))[0]
         rows.append({
             "question_id": question_id,
             "topic": topic,
             "subtopic": f"{topic} fundamentals",
-            "difficulty": rng.choices((1, 2, 3, 4, 5), weights=(10, 20, 35, 23, 12))[0],
+            "difficulty": difficulty,
             "question_text": f"Synthetic practice question about {topic} (item {question_id}).",
             "option_a": options["A"], "option_b": options["B"],
             "option_c": options["C"], "option_d": options["D"],
             "correct_option": correct,
-            "estimated_time": rng.randint(20, 150),
+            "estimated_time": max(15, int((19 + difficulty * 14) * rng.uniform(1.25, 1.75))),
             "error_mapping": json.dumps(mappings, sort_keys=True, separators=(",", ":")),
         })
     return rows
@@ -141,7 +142,8 @@ def _generate_interactions(config: GeneratorConfig, rng: random.Random, question
                      for pair in config.concept_pairs for pair_topic in pair}
         for student_id in students
     }
-    mistake_history: dict[tuple[int, str], list[str]] = defaultdict(list)
+    preferred_category: dict[tuple[int, str], str] = {}
+    option_repeats: dict[tuple[int, int, str], int] = defaultdict(int)
     question_attempt_counts: dict[tuple[int, int], int] = defaultdict(int)
     last_timestamps = {
         student_id: datetime(2025, 1, 1, tzinfo=timezone.utc) + timedelta(days=rng.randint(0, 28))
@@ -159,30 +161,35 @@ def _generate_interactions(config: GeneratorConfig, rng: random.Random, question
         progress = (index // len(students)) / max(1, (config.attempts - 1) // len(students))
         probability_correct = _accuracy_probability(behavior, difficulty, familiarity_score, progress)
         correct = rng.random() < probability_correct
+        response_time = _response_time(
+            rng, behavior, difficulty, familiarity_score, correct,
+            config.min_response_time, config.max_response_time,
+        )
 
         if correct:
             selected_option = question["correct_option"]
             error_type = "CORRECT"
         else:
             mapping = json.loads(question["error_mapping"])
-            selected_option = rng.choice(tuple(mapping))
-            error_type = mapping[selected_option]
+            category_by_option = {category: option for option, category in mapping.items()}
             history_key = (student_id, topic)
-            repeat_chance = 0.46 if behavior == "REPETITIVE_MISTAKE" else 0.16
-            if mistake_history[history_key] and rng.random() < repeat_chance:
-                error_type = "REPEATED_MISTAKE"
-            elif difficulty >= 4 and rng.random() < 0.20:
-                error_type = "DIFFICULTY_FAILURE"
-            elif behavior in ("FAST_ACCURATE", "CARELESS") and rng.random() < 0.12:
-                error_type = "CARELESS_ERROR"
-            elif behavior == "SLOW_ACCURATE" and rng.random() < 0.10:
+            category = preferred_category.get(history_key)
+            if (category not in category_by_option
+                    or rng.random() >= _persistence_probability(behavior)):
+                category = _choose_mistake_category(rng, behavior, tuple(category_by_option))
+                preferred_category[history_key] = category
+            selected_option = category_by_option[category]
+            error_type = category
+            estimated = max(1, question["estimated_time"])
+            option_key = (student_id, question["question_id"], selected_option)
+            if response_time >= estimated * 1.5:
                 error_type = "TIME_PRESSURE"
-            mistake_history[history_key].append(error_type)
+            elif difficulty >= 4 and response_time > estimated:
+                error_type = "DIFFICULTY_FAILURE"
+            elif option_repeats[option_key]:
+                error_type = "REPEATED_MISTAKE"
+            option_repeats[option_key] += 1
 
-        response_time = _response_time(
-            rng, behavior, difficulty, familiarity_score, correct,
-            config.min_response_time, config.max_response_time,
-        )
         timestamp = last_timestamps[student_id] + timedelta(minutes=rng.randint(8, 360))
         last_timestamps[student_id] = timestamp
         key = (student_id, question["question_id"])
@@ -238,6 +245,30 @@ def _response_time(rng, behavior, difficulty, familiarity, correct, minimum, max
         mean *= 1.10
     value = rng.lognormvariate(math.log(max(minimum, mean)), 0.32)
     return min(maximum, max(minimum, value))
+
+
+def _secondary_error(topic: str) -> str:
+    return "CALCULATION_ERROR" if sum(ord(char) for char in topic) % 2 == 0 else "PROCEDURE_ERROR"
+
+
+def _persistence_probability(behavior: str) -> float:
+    if behavior == "REPETITIVE_MISTAKE":
+        return 0.86
+    if behavior == "CONCEPT_CONFUSED":
+        return 0.78
+    return 0.68
+
+
+def _choose_mistake_category(rng: random.Random, behavior: str, categories: tuple[str, ...]) -> str:
+    weights = []
+    for category in categories:
+        if category == "CONCEPT_CONFUSION":
+            weights.append(2.8 if behavior in ("CONCEPT_CONFUSED", "IMPROVING") else 1.0)
+        elif category == "CARELESS_ERROR":
+            weights.append(2.8 if behavior in ("CARELESS", "FAST_ACCURATE", "DECLINING") else 1.0)
+        else:
+            weights.append(2.4 if behavior in ("DIFFICULTY_SENSITIVE", "SLOW_ACCURATE", "REPETITIVE_MISTAKE") else 1.0)
+    return rng.choices(categories, weights=weights, k=1)[0]
 
 
 def _paired_concept(topic: str, pairs: Sequence[tuple[str, str]]) -> str:

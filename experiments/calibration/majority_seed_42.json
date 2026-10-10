@@ -1,6 +1,6 @@
 {
-  "brier_score": 0.8134887104010706,
-  "ece": 0.012996676422441678,
+  "brier_score": 0.7923259276654803,
+  "ece": 0.013220018885741258,
   "bins": [
     {
       "bin": 0,
@@ -22,17 +22,17 @@
       "bin": 2,
       "lower": 0.2,
       "upper": 0.30000000000000004,
-      "count": 228,
-      "mean_confidence": 0.27615457115928377,
-      "accuracy": 0.2631578947368421
+      "count": 0,
+      "mean_confidence": 0.0,
+      "accuracy": 0.0
     },
     {
       "bin": 3,
       "lower": 0.30000000000000004,
       "upper": 0.4,
-      "count": 0,
-      "mean_confidence": 0.0,
-      "accuracy": 0.0
+      "count": 228,
+      "mean_confidence": 0.32011331444759206,
+      "accuracy": 0.3333333333333333
     },
     {
       "bin": 4,

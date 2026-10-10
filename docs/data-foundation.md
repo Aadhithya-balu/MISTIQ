@@ -14,6 +14,6 @@ Generate the default 100-student, 500-question, 10,000-attempt dataset with:
 python -m backend.ml.datasets.synthetic_generator --seed 42
 ```
 
-Use `--students`, `--questions`, and `--attempts` to change the dataset size; `--min-response-time` and `--max-response-time` set response bounds. The Python `GeneratorConfig` also accepts custom concept confusion pairs. Reusing a seed and configuration reproduces the same rows. Student behavior profiles are latent generator settings and are not exported as labels.
+Use `--students`, `--questions`, and `--attempts` to change the dataset size; `--min-response-time` and `--max-response-time` set response bounds. The Python `GeneratorConfig` also accepts custom concept confusion pairs. Reusing a seed and configuration reproduces the same rows. Student behavior profiles are latent generator settings and are not exported as labels. Mistakes are autocorrelated: each `(student, topic)` keeps a persistent misconception category that is usually repeated, and time- or difficulty-based overrides follow the same rule as the live mistake classifier, so the learned next-mistake signal is not independent noise.
 
 All generated question content and interactions are synthetic. They are for data-pipeline development and do not represent real student records. To reproduce Phase 4 results, keep the same generated CSV files or regenerate them with the recorded seed and generator configuration.

@@ -1,6 +1,6 @@
 {
-  "brier_score": 0.8222484623895039,
-  "ece": 0.021329697991556443,
+  "brier_score": 0.641778387536167,
+  "ece": 0.09896398674196952,
   "bins": [
     {
       "bin": 0,
@@ -14,73 +14,73 @@
       "bin": 1,
       "lower": 0.1,
       "upper": 0.2,
-      "count": 5,
-      "mean_confidence": 0.19366575021896743,
-      "accuracy": 0.2
+      "count": 4,
+      "mean_confidence": 0.19423810488957532,
+      "accuracy": 0.0
     },
     {
       "bin": 2,
       "lower": 0.2,
       "upper": 0.30000000000000004,
-      "count": 211,
-      "mean_confidence": 0.23274228947215786,
-      "accuracy": 0.24644549763033174
+      "count": 97,
+      "mean_confidence": 0.22971031701790903,
+      "accuracy": 0.29896907216494845
     },
     {
       "bin": 3,
       "lower": 0.30000000000000004,
       "upper": 0.4,
-      "count": 11,
-      "mean_confidence": 0.32060177067372786,
-      "accuracy": 0.18181818181818182
+      "count": 2,
+      "mean_confidence": 0.37278686332912303,
+      "accuracy": 0.0
     },
     {
       "bin": 4,
       "lower": 0.4,
       "upper": 0.5,
-      "count": 1,
-      "mean_confidence": 0.41350349438400985,
-      "accuracy": 0.0
+      "count": 21,
+      "mean_confidence": 0.4617508428862245,
+      "accuracy": 0.5714285714285714
     },
     {
       "bin": 5,
       "lower": 0.5,
       "upper": 0.6000000000000001,
-      "count": 0,
-      "mean_confidence": 0.0,
-      "accuracy": 0.0
+      "count": 35,
+      "mean_confidence": 0.5528112498424321,
+      "accuracy": 0.8
     },
     {
       "bin": 6,
       "lower": 0.6000000000000001,
       "upper": 0.7000000000000001,
-      "count": 0,
-      "mean_confidence": 0.0,
-      "accuracy": 0.0
+      "count": 33,
+      "mean_confidence": 0.6534172828078099,
+      "accuracy": 0.6666666666666666
     },
     {
       "bin": 7,
       "lower": 0.7000000000000001,
       "upper": 0.8,
-      "count": 0,
-      "mean_confidence": 0.0,
-      "accuracy": 0.0
+      "count": 30,
+      "mean_confidence": 0.7344928030293599,
+      "accuracy": 0.6666666666666666
     },
     {
       "bin": 8,
       "lower": 0.8,
       "upper": 0.9,
-      "count": 0,
-      "mean_confidence": 0.0,
-      "accuracy": 0.0
+      "count": 5,
+      "mean_confidence": 0.839889099188375,
+      "accuracy": 1.0
     },
     {
       "bin": 9,
       "lower": 0.9,
       "upper": 1.0,
-      "count": 0,
-      "mean_confidence": 0.0,
-      "accuracy": 0.0
+      "count": 1,
+      "mean_confidence": 0.9042432354956798,
+      "accuracy": 1.0
     }
   ],
   "interpretation": "measured; softmax normalization alone is not calibration"

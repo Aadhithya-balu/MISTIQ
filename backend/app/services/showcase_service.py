@@ -63,18 +63,15 @@ _CURATED_QUESTIONS: tuple[dict[str, Any], ...] = (
 
 
 # Deterministic practice history for the demo student. The final seeded attempt is a
-# Precision/Recall concept confusion on Q506; Q507 (Precision) is left unattempted so
-# the live demo can exercise it against the stored prediction.
+# Recall concept confusion on Q506; Q507 (Precision) is left unattempted so the live
+# demo can exercise it against the stored prediction.
 #
-# Note: the Q502 (CALCULATION_ERROR) and Q508 (CARELESS_ERROR) attempts are on
-# Recall-topic questions for a reason. The trained model's concept_confusion feature
-# carries a negative weight for the CONCEPT_CONFUSION class, so a history whose
-# Recall-topic errors are *all* confusion suppresses the concept-confusion prediction.
-# Diluting the Recall context with one calculation and one careless error lets the real
-# pipeline surface CONCEPT_CONFUSION on the final 506B attempt instead of CARELESS_ERROR.
+# The Recall-topic errors are all CONCEPT_CONFUSION (option B) so the persistence
+# learned from the synthetic interactions surfaces CONCEPT_CONFUSION for the final
+# 506B attempt rather than the globally common CARELESS_ERROR.
 _SEED_ATTEMPTS: tuple[tuple[int, str], ...] = (
-    (501, "A"), (502, "D"), (503, "B"), (504, "A"), (505, "A"),
-    (501, "B"), (502, "A"), (508, "C"),
+    (501, "A"), (502, "B"), (503, "B"), (504, "A"), (505, "A"),
+    (501, "B"), (502, "A"), (508, "B"),
     (509, "A"), (510, "A"), (511, "A"), (512, "A"), (513, "A"), (514, "A"),
     (506, "A"), (506, "B"),
 )
