@@ -36,14 +36,14 @@ export default function AppLayout() {
           <div className="sidebar-footer">
             <div className="avatar" aria-hidden="true">{student.name.slice(0, 1).toUpperCase()}</div>
             <div className="sidebar-person"><strong>{student.name}</strong><span>Student #{student.id}</span></div>
-            <button type="button" className="icon-button" title="Change student" aria-label="Change student" onClick={() => leave()}>⇥</button>
+            <button type="button" className="sidebar-logout" onClick={() => leave()}>Sign out</button>
           </div>
         )}
       </aside>
 
       <header className="mobile-header">
         <div className="brand">MISTIQ <span>2.0</span></div>
-        {student && <button type="button" className="mobile-logout" onClick={() => leave()}>Change student</button>}
+        {student && <button type="button" className="mobile-logout" onClick={() => leave()}>Sign out</button>}
       </header>
 
       <main className="main-content"><Outlet /></main>

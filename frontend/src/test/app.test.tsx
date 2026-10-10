@@ -25,10 +25,18 @@ const prediction = {
 function jsonResponse(body: unknown, status = 200) {
   return Promise.resolve({ ok: status >= 200 && status < 300, status, json: async () => body } as Response)
 }
+function renderApp(path: string) {
+  render(<MemoryRouter initialEntries={[path]}><StudentProvider><App /></StudentProvider></MemoryRouter>)
+}
+async function signIn(name = 'Sam Learner') {
+  fireEvent.change(await screen.findByLabelText('Your name'), { target: { value: name } })
+  fireEvent.click(screen.getByRole('button', { name: /create my local profile/i }))
+}
+function createProfile() { return jsonResponse(profile, 201) }
 function setup(path: string, options: { predictionStatus?: number; progress?: Record<string, unknown>; mistakes?: unknown[] } = {}) {
-  localStorage.setItem('mistiq.development.studentId', '7')
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    if (url.endsWith('/students') && init?.method === 'POST') return createProfile()
     if (url.endsWith('/students/7')) return jsonResponse(profile)
     if (url.endsWith('/students/7/progress')) return jsonResponse(options.progress || { student_id: 7, attempt_count: 0, correct_count: 0, accuracy: 0, mistake_count: 0 })
     if (url.endsWith('/students/7/mistakes')) return jsonResponse(options.mistakes || [])
@@ -42,12 +50,30 @@ function setup(path: string, options: { predictionStatus?: number; progress?: Re
     return jsonResponse({ detail: 'Unexpected test API request' }, 500)
   })
   vi.stubGlobal('fetch', fetchMock)
-  render(<MemoryRouter initialEntries={[path]}><StudentProvider><App /></StudentProvider></MemoryRouter>)
+  renderApp(path)
+  void signIn()
   return fetchMock
 }
 
 describe('MISTIQ student app', () => {
   afterEach(() => { vi.unstubAllGlobals(); localStorage.clear() })
+
+  it('always opens on the local sign-in page before any protected view', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(profile)))
+    renderApp('/dashboard')
+    expect(await screen.findByText('Continue with a local profile')).toBeTruthy()
+    expect(screen.queryByText('Good to see you, Sam.')).toBeNull()
+    expect(screen.getByRole('link', { name: /how it works/i }).getAttribute('href')).toBe('#learn-more')
+    expect(document.querySelector('#learn-more')).toBeTruthy()
+    expect(screen.getByText('A loop that learns from each attempt.')).toBeTruthy()
+  })
+
+  it('signs out from the sidebar and returns to sign-in', async () => {
+    setup('/dashboard', { progress: { student_id: 7, attempt_count: 8, correct_count: 6, accuracy: 0.75, mistake_count: 2 } })
+    expect(await screen.findByText('Good to see you, Sam.')).toBeTruthy()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Sign out' })[0])
+    expect(await screen.findByText('Continue with a local profile')).toBeTruthy()
+  })
 
   it('loads the dashboard with progress and recent mistake data', async () => {
     setup('/dashboard', {
@@ -58,6 +84,32 @@ describe('MISTIQ student app', () => {
     expect(screen.getByText('75')).toBeTruthy()
     expect(screen.getAllByText('Concept confusion').length).toBeGreaterThan(0)
     expect(screen.getByText('No challenge identified yet')).toBeTruthy()
+  })
+
+  it('surfaces offline model quality from the real evaluation results', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/students') && init?.method === 'POST') return createProfile()
+      if (url.endsWith('/students/7')) return jsonResponse(profile)
+      if (url.endsWith('/students/7/progress')) return jsonResponse({ student_id: 7, attempt_count: 8, correct_count: 6, accuracy: 0.75, mistake_count: 2 })
+      if (url.endsWith('/students/7/mistakes')) return jsonResponse([])
+      if (url.endsWith('/predictions/7/latest')) return jsonResponse({ detail: 'Insufficient history' }, 409)
+      if (url.endsWith('/research/evaluation')) return jsonResponse({
+        available: true, source: 'experiments/reports/comparison.csv',
+        results: [
+          { model_name: 'MISTIQ-AMPA', seed: 'mean', accuracy: 0.5263, macro_f1: 0.3126, ece: 0.097 },
+          { model_name: 'Majority', seed: 'mean', accuracy: 0.3333, macro_f1: 0.0714, ece: 0.0132 },
+        ],
+      })
+      return jsonResponse({ detail: 'Not found' }, 404)
+    }))
+    renderApp('/dashboard')
+    void signIn()
+    expect(await screen.findByText('How well MISTIQ predicts the next mistake')).toBeTruthy()
+    expect(screen.getAllByText('53%').length).toBeGreaterThan(0)
+    expect(screen.getByText('33%')).toBeTruthy()
+    expect(screen.getByText('Calibration error')).toBeTruthy()
+    expect(screen.getByText('Macro-F1')).toBeTruthy()
   })
 
   it('loads a backend question, submits the answer, and shows checked feedback', async () => {
@@ -75,22 +127,25 @@ describe('MISTIQ student app', () => {
   })
 
   it('shows the question loading state until the API responds', async () => {
-    localStorage.setItem('mistiq.development.studentId', '7')
-    let finishQuestions!: (value: Response) => void
-    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+    let resolveQuestions!: (value: Response) => void
+    const questionsPending = new Promise<Response>(resolve => { resolveQuestions = resolve })
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/students') && init?.method === 'POST') return createProfile()
       if (String(input).endsWith('/students/7')) return jsonResponse(profile)
-      if (String(input).endsWith('/questions')) return new Promise<Response>(resolve => { finishQuestions = resolve })
+      if (String(input).endsWith('/questions')) return questionsPending
       return jsonResponse({ detail: 'not found' }, 404)
     }))
-    render(<MemoryRouter initialEntries={['/practice']}><StudentProvider><App /></StudentProvider></MemoryRouter>)
+    renderApp('/practice')
+    void signIn()
     expect(await screen.findByText('Finding a question…')).toBeTruthy()
-    finishQuestions(await jsonResponse([question]))
+    resolveQuestions(await jsonResponse([question]))
     expect(await screen.findByText(question.question_text)).toBeTruthy()
   })
 
   it('shows an incorrect-answer feedback panel without blame', async () => {
     const fetchMock = setup('/practice')
     fetchMock.mockImplementation(async (input, init) => {
+      if (String(input).endsWith('/students')) return createProfile()
       if (String(input).endsWith('/students/7')) return jsonResponse(profile)
       if (String(input).endsWith('/questions')) return jsonResponse([question])
       if (String(input).endsWith('/attempts') && init?.method === 'POST') return jsonResponse({
@@ -107,18 +162,18 @@ describe('MISTIQ student app', () => {
     expect(screen.getByText(/A good concept to revisit/i)).toBeTruthy()
   })
 
-  it('shows a useful backend-unavailable state', async () => {
-    localStorage.setItem('mistiq.development.studentId', '7')
+  it('reports clearly when the backend is unavailable during sign in', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('network failure') }))
-    render(<MemoryRouter initialEntries={['/practice']}><StudentProvider><App /></StudentProvider></MemoryRouter>)
+    renderApp('/practice')
+    void signIn()
     expect(await screen.findByRole('alert')).toBeTruthy()
-    expect(screen.getByText(/could not restore your student profile/i)).toBeTruthy()
+    expect(screen.getByText(/could not reach the learning service/i)).toBeTruthy()
   })
 
   it('creates a local profile without claiming authentication', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url.endsWith('/students') && init?.method === 'POST') return jsonResponse(profile, 201)
+      if (url.endsWith('/students') && init?.method === 'POST') return createProfile()
       if (url.endsWith('/students/7')) return jsonResponse(profile)
       if (url.endsWith('/students/7/progress')) return jsonResponse({ student_id: 7, attempt_count: 0, correct_count: 0, accuracy: 0, mistake_count: 0 })
       if (url.endsWith('/students/7/mistakes')) return jsonResponse([])
@@ -126,7 +181,7 @@ describe('MISTIQ student app', () => {
       return jsonResponse({ detail: 'Not found' }, 404)
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<MemoryRouter initialEntries={['/login']}><StudentProvider><App /></StudentProvider></MemoryRouter>)
+    renderApp('/login')
     expect(await screen.findByText(/No account, email, or sign-up is required\./)).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Sam Learner' } })
     fireEvent.click(screen.getByRole('button', { name: /create my local profile/i }))
@@ -144,7 +199,7 @@ describe('MISTIQ student app', () => {
       return jsonResponse({ detail: 'Not found' }, 404)
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(<MemoryRouter initialEntries={['/login']}><StudentProvider><App /></StudentProvider></MemoryRouter>)
+    renderApp('/login')
     expect(await screen.findByText(/A learning system that predicts what a student may struggle with next/)).toBeTruthy()
     expect(screen.queryByText('Showcase Mode')).toBeNull()
     fireEvent.change(screen.getByLabelText('Student ID'), { target: { value: '1' } })
@@ -155,8 +210,8 @@ describe('MISTIQ student app', () => {
   })
 
   it('renders learning-profile signals from the stored learner state', async () => {
-    localStorage.setItem('mistiq.development.studentId', '7')
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/students') && init?.method === 'POST') return createProfile()
       if (String(input).endsWith('/students/7')) return jsonResponse(profile)
       if (String(input).endsWith('/students/7/state')) return jsonResponse({
         id: 1, student_id: 7, updated_at: '2026-09-18T10:00:00', attempt_count: 8, relevant_mistake_count: 2,
@@ -165,7 +220,8 @@ describe('MISTIQ student app', () => {
       })
       return jsonResponse({ detail: 'Not found' }, 404)
     }))
-    render(<MemoryRouter initialEntries={['/profile']}><StudentProvider><App /></StudentProvider></MemoryRouter>)
+    renderApp('/profile')
+    void signIn()
     expect(await screen.findByText('Your learning profile')).toBeTruthy()
     expect(screen.getByText('Concept confidence')).toBeTruthy()
     expect(screen.getByText('Challenge handling')).toBeTruthy()
@@ -173,9 +229,9 @@ describe('MISTIQ student app', () => {
   })
 
   it('renders progress analytics and accessible real-history trajectory data', async () => {
-    localStorage.setItem('mistiq.development.studentId', '7')
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+      if (url.endsWith('/students') && init?.method === 'POST') return createProfile()
       if (url.endsWith('/students/7')) return jsonResponse(profile)
       if (url.endsWith('/students/7/progress')) return jsonResponse({
         student_id: 7, attempt_count: 4, correct_count: 3, accuracy: 0.75, mistake_count: 1,
@@ -190,7 +246,8 @@ describe('MISTIQ student app', () => {
       })
       return jsonResponse({ detail: 'Not found' }, 404)
     }))
-    render(<MemoryRouter initialEntries={['/progress']}><StudentProvider><App /></StudentProvider></MemoryRouter>)
+    renderApp('/progress')
+    void signIn()
     expect(await screen.findByText('Topic progress')).toBeTruthy()
     expect(screen.getByText('Precision')).toBeTruthy()
     expect(screen.getByRole('img', { name: 'Cumulative accuracy and attempted difficulty by chronological attempt number' })).toBeTruthy()
@@ -198,9 +255,9 @@ describe('MISTIQ student app', () => {
   })
 
   it('renders categorized mistakes, repeated patterns, and observed concept pairs', async () => {
-    localStorage.setItem('mistiq.development.studentId', '7')
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+      if (url.endsWith('/students') && init?.method === 'POST') return createProfile()
       if (url.endsWith('/students/7')) return jsonResponse(profile)
       if (url.endsWith('/mistakes/7/summary')) return jsonResponse({
         student_id: 7, mistake_count: 3, attempt_count: 6,
@@ -212,7 +269,8 @@ describe('MISTIQ student app', () => {
       })
       return jsonResponse({ detail: 'Not found' }, 404)
     }))
-    render(<MemoryRouter initialEntries={['/mistakes']}><StudentProvider><App /></StudentProvider></MemoryRouter>)
+    renderApp('/mistakes')
+    void signIn()
     expect(await screen.findByText('3 recorded review moments')).toBeTruthy()
     expect(screen.getByText('Patterns that have appeared more than once')).toBeTruthy()
     expect(screen.getByText(/3 confusion events/)).toBeTruthy()
@@ -229,9 +287,9 @@ describe('MISTIQ student app', () => {
   })
 
   it('shows model evidence and a database-backed recommended question', async () => {
-    localStorage.setItem('mistiq.development.studentId', '7')
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+      if (url.endsWith('/students') && init?.method === 'POST') return createProfile()
       if (url.endsWith('/students/7')) return jsonResponse(profile)
       if (url.endsWith('/students/7/progress')) return jsonResponse({ student_id: 7, attempt_count: 31, correct_count: 22, accuracy: 0.71, mistake_count: 9 })
       if (url.endsWith('/students/7/mistakes')) return jsonResponse([mistake])
@@ -247,7 +305,8 @@ describe('MISTIQ student app', () => {
       })
       return jsonResponse({ detail: 'Not found' }, 404)
     }))
-    render(<MemoryRouter initialEntries={['/dashboard']}><StudentProvider><App /></StudentProvider></MemoryRouter>)
+    renderApp('/dashboard')
+    void signIn()
     expect(await screen.findByText('Classification')).toBeTruthy()
     fireEvent.click(screen.getByText('Why am I seeing this?'))
     expect(await screen.findByText('Recent mistakes contributed to the model score.')).toBeTruthy()
