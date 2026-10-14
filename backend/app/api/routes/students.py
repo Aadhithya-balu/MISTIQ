@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_db
-from app.models import Student
+from app.api.dependencies import authorize_student, get_db, require_admin
+from app.models import Student, User
 from app.schemas.entities import ErrorResponse, MistakeAnalyticsRead, MistakeEvent as MistakeRead, Student as StudentRead, StudentCreate
 from app.services.errors import StudentNotFound
 from app.services.analytics_data import load_student_history
@@ -11,7 +11,8 @@ from app.services.mistake_analytics_service import build_mistake_analytics
 router = APIRouter()
 
 
-@router.post("/students", response_model=StudentRead, status_code=201, summary="Create a student")
+@router.post("/students", response_model=StudentRead, status_code=201, summary="Create a student",
+             dependencies=[Depends(require_admin)])
 def create_student(payload: StudentCreate, session: Session = Depends(get_db)):
     student = Student(name=payload.name)
     session.add(student)
@@ -22,7 +23,7 @@ def create_student(payload: StudentCreate, session: Session = Depends(get_db)):
 
 @router.get("/students/{student_id}", response_model=StudentRead, summary="Retrieve a student",
             responses={404: {"model": ErrorResponse, "description": "Student not found"}})
-def get_student(student_id: int, session: Session = Depends(get_db)):
+def get_student(student_id: int, session: Session = Depends(get_db), _: User = Depends(authorize_student)):
     student = session.get(Student, student_id)
     if student is None:
         raise StudentNotFound(f"Student {student_id} was not found")
@@ -31,7 +32,7 @@ def get_student(student_id: int, session: Session = Depends(get_db)):
 
 @router.get("/students/{student_id}/mistakes", response_model=list[MistakeRead], summary="List a student's mistake events",
             responses={404: {"model": ErrorResponse, "description": "Student not found"}})
-def get_mistakes(student_id: int, session: Session = Depends(get_db)):
+def get_mistakes(student_id: int, session: Session = Depends(get_db), _: User = Depends(authorize_student)):
     if session.get(Student, student_id) is None:
         raise StudentNotFound(f"Student {student_id} was not found")
     history = load_student_history(session, student_id)
@@ -48,26 +49,27 @@ def _mistake_analytics(student_id: int, session: Session):
 
 
 @router.get("/mistakes/{student_id}", response_model=list[MistakeRead], summary="List a student's mistakes")
-def list_mistakes(student_id: int, session: Session = Depends(get_db)):
+def list_mistakes(student_id: int, session: Session = Depends(get_db), _: User = Depends(authorize_student)):
     return get_mistakes(student_id, session)
 
 
 @router.get("/mistakes/{student_id}/summary", response_model=MistakeAnalyticsRead,
             summary="Summarize mistake types and frequency")
-def get_mistake_summary(student_id: int, session: Session = Depends(get_db)):
+def get_mistake_summary(student_id: int, session: Session = Depends(get_db), _: User = Depends(authorize_student)):
     return _mistake_analytics(student_id, session)
 
 
 @router.get("/mistakes/{student_id}/repeated", summary="List repeated mistake patterns")
-def get_repeated_mistakes(student_id: int, session: Session = Depends(get_db)):
+def get_repeated_mistakes(student_id: int, session: Session = Depends(get_db), _: User = Depends(authorize_student)):
     return _mistake_analytics(student_id, session)["repeated"]
 
 
 @router.get("/mistakes/{student_id}/confusions", summary="Return observed concept confusion pairs")
-def get_concept_confusions(student_id: int, session: Session = Depends(get_db)):
+def get_concept_confusions(student_id: int, session: Session = Depends(get_db), _: User = Depends(authorize_student)):
     return _mistake_analytics(student_id, session)["confusions"]
 
-@router.get("/students", response_model=list[StudentRead], summary="List students")
+@router.get("/students", response_model=list[StudentRead], summary="List students",
+            dependencies=[Depends(require_admin)])
 def list_students(session: Session = Depends(get_db)):
     from sqlalchemy import select
     return list(session.scalars(select(Student).order_by(Student.id)))

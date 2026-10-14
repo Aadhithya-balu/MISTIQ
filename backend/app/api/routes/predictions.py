@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_ampa_service, get_db
-from app.models import Prediction, Student
+from app.api.dependencies import authorize_student, get_ampa_service, get_db
+from app.models import Prediction, Student, User
 from app.schemas.entities import ErrorResponse, PredictionExplanation, PredictionRead
 from app.services.ampa_service import AMPAService
 from app.services.errors import InsufficientData, StudentNotFound
@@ -40,7 +40,8 @@ def _latest(session, student_id):
                 503: {"model": ErrorResponse, "description": "Trained AMPA model unavailable"},
             })
 def get_prediction(student_id: int, session: Session = Depends(get_db),
-                   _: AMPAService = Depends(get_ampa_service)):
+                   _: AMPAService = Depends(get_ampa_service),
+                   __: User = Depends(authorize_student)):
     return _latest(session, student_id)[0]
 
 
@@ -51,7 +52,8 @@ def get_prediction(student_id: int, session: Session = Depends(get_db),
                 503: {"model": ErrorResponse, "description": "Trained AMPA model unavailable"},
             })
 def get_latest_prediction(student_id: int, session: Session = Depends(get_db),
-                          _: AMPAService = Depends(get_ampa_service)):
+                          _: AMPAService = Depends(get_ampa_service),
+                          __: User = Depends(authorize_student)):
     return _latest(session, student_id)[0]
 
 
@@ -62,7 +64,8 @@ def get_latest_prediction(student_id: int, session: Session = Depends(get_db),
                 503: {"model": ErrorResponse, "description": "Trained AMPA model unavailable"},
             })
 def get_latest_explanation(student_id: int, session: Session = Depends(get_db),
-                           _: AMPAService = Depends(get_ampa_service)):
+                           _: AMPAService = Depends(get_ampa_service),
+                           __: User = Depends(authorize_student)):
     _, prediction = _latest(session, student_id)
     payload = dict(prediction.explanation or {})
     reasons = payload.get("reasons", [])

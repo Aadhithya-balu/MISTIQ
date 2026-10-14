@@ -7,8 +7,23 @@ from app.core.config import settings
 from app.db.base import Base
 from app.models import entities  # noqa: F401 - register model metadata
 
+
+def _normalized_database_url(url: str) -> str:
+    """Map plain Postgres URLs (e.g. Supabase) onto the psycopg driver.
+
+    Supabase hands out ``postgresql://`` (or legacy ``postgres://``) connection
+    strings. SQLAlchemy 2 needs an explicit driver, so we point them at
+    ``psycopg`` (psycopg 3). SQLite and any already-qualified URL pass through
+    unchanged, which keeps the local ``mistiq.db`` fallback byte-for-byte.
+    """
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+    return url
+
+
 connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-engine = create_engine(settings.database_url, connect_args=connect_args)
+engine = create_engine(_normalized_database_url(settings.database_url), connect_args=connect_args, pool_pre_ping=True)
 if settings.database_url.startswith("sqlite"):
     @event.listens_for(engine, "connect")
     def enable_sqlite_foreign_keys(connection, _record):

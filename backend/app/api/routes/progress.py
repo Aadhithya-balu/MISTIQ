@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_db
-from app.models import LearnerState, Student
+from app.api.dependencies import authorize_student, get_db
+from app.models import LearnerState, Student, User
 from app.schemas.entities import ErrorResponse, LearnerState as LearnerStateRead, ProgressRead
 from app.services.errors import InsufficientData, StudentNotFound
 from app.services.analytics_data import load_student_history
@@ -17,7 +17,7 @@ router = APIRouter()
             responses={404: {"model": ErrorResponse, "description": "Student not found"}})
 @router.get("/students/{student_id}/progress", response_model=ProgressRead, summary="Get student progress analytics",
             responses={404: {"model": ErrorResponse, "description": "Student not found"}})
-def get_progress(student_id: int, session: Session = Depends(get_db)):
+def get_progress(student_id: int, session: Session = Depends(get_db), _: User = Depends(authorize_student)):
     if session.get(Student, student_id) is None:
         raise StudentNotFound(f"Student {student_id} was not found")
     history = load_student_history(session, student_id)
@@ -37,7 +37,7 @@ def get_progress(student_id: int, session: Session = Depends(get_db)):
                 404: {"model": ErrorResponse, "description": "Student not found"},
                 409: {"model": ErrorResponse, "description": "Learner state is not available yet"},
             })
-def get_learner_state(student_id: int, session: Session = Depends(get_db)):
+def get_learner_state(student_id: int, session: Session = Depends(get_db), _: User = Depends(authorize_student)):
     if session.get(Student, student_id) is None:
         raise StudentNotFound(f"Student {student_id} was not found")
     state = session.scalar(select(LearnerState).where(LearnerState.student_id == student_id))

@@ -1,4 +1,7 @@
 export type ErrorType = 'CORRECT' | 'CONCEPT_CONFUSION' | 'CALCULATION_ERROR' | 'PROCEDURE_ERROR' | 'CARELESS_ERROR' | 'TIME_PRESSURE' | 'DIFFICULTY_FAILURE' | 'REPEATED_MISTAKE'
+export type UserRole = 'student' | 'admin'
+export interface AuthUser { id: number; username: string; role: UserRole; name: string | null; student_id: number | null }
+export interface AuthResponse { token: string; user: AuthUser }
 export interface Student { id: number; name: string; created_at: string }
 export type OptionKey = 'A' | 'B' | 'C' | 'D'
 export interface Question { question_id: number; topic: string; subtopic: string | null; difficulty: 1 | 2 | 3 | 4 | 5; question_text: string; option_a: string; option_b: string; option_c: string; option_d: string; estimated_time: number }

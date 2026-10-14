@@ -19,6 +19,9 @@ class Settings:
     analytics_trend_threshold: float = max(0.0, float(os.getenv("MISTIQ_ANALYTICS_TREND_THRESHOLD", "0.05")))
     analytics_recovery_window: int = max(1, int(os.getenv("MISTIQ_ANALYTICS_RECOVERY_WINDOW", "3")))
     analytics_mistake_bucket: str = "daily" if os.getenv("MISTIQ_ANALYTICS_MISTAKE_BUCKET", "weekly").lower() == "daily" else "weekly"
+    admin_username: str = os.getenv("MISTIQ_ADMIN_USERNAME", "admin").strip() or "admin"
+    admin_password: str = os.getenv("MISTIQ_ADMIN_PASSWORD", "admin")
+    session_ttl_hours: int = max(1, int(os.getenv("MISTIQ_SESSION_TTL_HOURS", "720")))
 
 
 settings = Settings()

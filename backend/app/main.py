@@ -13,6 +13,7 @@ from app.db.session import engine as default_engine, migrate_sqlite_schema
 from app.models import entities  # noqa: F401 - register model metadata
 from app.services.ampa_service import AMPAService
 from app.services.errors import IntegrationError
+from app.services import auth_service
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,11 @@ def create_app(database_engine=None, ampa_service=None) -> FastAPI:
         if selected_engine.dialect.name == "sqlite":
             migrate_sqlite_schema(selected_engine)
         application.state.SessionLocal = session_factory
+        try:
+            with session_factory() as session:
+                auth_service.ensure_admin(session, settings.admin_username, settings.admin_password)
+        except Exception:
+            logger.exception("Admin account seeding failed")
         service = ampa_service or AMPAService(settings.ampa_model_path)
         try:
             service.load_once()

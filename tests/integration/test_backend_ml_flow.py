@@ -16,6 +16,12 @@ ROOT = Path(__file__).resolve().parents[2]
 ARTIFACT = ROOT / "backend" / "ml" / "artifacts" / "ampa.npz"
 
 
+def sign_in_admin(client):
+    response = client.post("/api/auth/login", json={"username": "admin", "password": "admin"})
+    assert response.status_code == 200, response.text
+    client.headers["Authorization"] = f"Bearer {response.json()['token']}"
+
+
 def make_test_app():
     engine = create_engine(
         "sqlite://",
@@ -40,6 +46,7 @@ def make_test_app():
 def test_real_ampa_attempt_to_prediction_flow_and_cold_start():
     application, factory, service = make_test_app()
     with TestClient(application) as client:
+        sign_in_admin(client)
         assert client.get("/health").json() == {"status": "ok"}
         created = client.post("/api/students", json={"name": "  Ada Learner  "})
         assert created.status_code == 201
@@ -126,6 +133,7 @@ def test_real_ampa_attempt_to_prediction_flow_and_cold_start():
 def test_unknown_references_and_invalid_attempt_are_rejected():
     application, _, _ = make_test_app()
     with TestClient(application) as client:
+        sign_in_admin(client)
         student_id = client.post("/api/students", json={"name": "Learner"}).json()["id"]
         missing_student = client.post("/api/attempts", json={
             "student_id": 999, "question_id": 1,
@@ -158,6 +166,7 @@ def test_missing_artifact_fails_clearly_without_fake_prediction():
     service = AMPAService(ARTIFACT.with_name("missing-ampa-test.npz"))
     application = create_app(database_engine=engine, ampa_service=service)
     with TestClient(application) as client:
+        sign_in_admin(client)
         student = client.post("/api/students", json={"name": "No model learner"}).json()
         response = client.post("/api/attempts", json={
             "student_id": student["id"], "question_id": 1,
@@ -171,6 +180,7 @@ def test_missing_artifact_fails_clearly_without_fake_prediction():
 def test_recommendation_cold_start_and_completion_loop_uses_real_question_and_ampa():
     application, factory, _ = make_test_app()
     with TestClient(application) as client:
+        sign_in_admin(client)
         student = client.post("/api/students", json={"name": "Recommendation learner"}).json()
         student_id = student["id"]
         next_step = client.get(f"/api/recommendations/{student_id}/next")
@@ -214,6 +224,7 @@ def test_recommendation_prefers_unattempted_question_during_cold_start():
         ))
         session.commit()
     with TestClient(application) as client:
+        sign_in_admin(client)
         student_id = client.post("/api/students", json={"name": "Novel practice learner"}).json()["id"]
         first = client.get(f"/api/recommendations/{student_id}/next").json()
         client.post("/api/attempts", json={
@@ -236,6 +247,7 @@ def test_same_topic_different_distractor_is_not_a_repeated_mistake():
         ))
         session.commit()
     with TestClient(application) as client:
+        sign_in_admin(client)
         student_id = client.post("/api/students", json={"name": "Repeat classification learner"}).json()["id"]
         first = client.post("/api/attempts", json={"student_id": student_id, "question_id": 1,
                                   "selected_option": "B", "response_time": 20})
@@ -251,6 +263,7 @@ def test_same_topic_different_distractor_is_not_a_repeated_mistake():
 def test_normal_operation_recommendation_uses_documented_weighted_score():
     application, _, _ = make_test_app()
     with TestClient(application) as client:
+        sign_in_admin(client)
         student_id = client.post("/api/students", json={"name": "Adaptive learner"}).json()["id"]
         for index in range(30):
             response = client.post("/api/attempts", json={
@@ -275,6 +288,7 @@ def test_normal_operation_recommendation_uses_documented_weighted_score():
 def test_phase8_real_attempt_analytics_and_historical_prefix_stays_unchanged():
     application, _, _ = make_test_app()
     with TestClient(application) as client:
+        sign_in_admin(client)
         student_id = client.post("/api/students", json={"name": "Analytics learner"}).json()["id"]
         sequence = ["B", "B", "C", "A", "B", "A", "A", "A"]
         for index, selected in enumerate(sequence):
@@ -315,6 +329,7 @@ def test_phase8_real_attempt_analytics_and_historical_prefix_stays_unchanged():
 def test_phase8_empty_student_response_is_explicit_and_safe():
     application, _, _ = make_test_app()
     with TestClient(application) as client:
+        sign_in_admin(client)
         student_id = client.post("/api/students", json={"name": "New learner"}).json()["id"]
         progress = client.get(f"/api/progress/{student_id}")
         assert progress.status_code == 200, progress.text
