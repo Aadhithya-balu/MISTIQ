@@ -45,3 +45,23 @@ class InsufficientData(IntegrationError):
 class InvalidFeatureVector(IntegrationError):
     status_code = 422
     code = "invalid_feature_vector"
+
+
+class NotAuthenticated(IntegrationError):
+    status_code = 401
+    code = "not_authenticated"
+
+
+class InvalidCredentials(IntegrationError):
+    status_code = 401
+    code = "invalid_credentials"
+
+
+class Forbidden(IntegrationError):
+    status_code = 403
+    code = "forbidden"
+
+
+class UsernameTaken(IntegrationError):
+    status_code = 409
+    code = "username_taken"

@@ -20,6 +20,12 @@ ROOT = Path(__file__).resolve().parents[2]
 ARTIFACT = ROOT / "backend" / "ml" / "artifacts" / "ampa.npz"
 
 
+def sign_in_admin(client):
+    response = client.post("/api/auth/login", json={"username": "admin", "password": "admin"})
+    assert response.status_code == 200, response.text
+    client.headers["Authorization"] = f"Bearer {response.json()['token']}"
+
+
 def make_showcase_app():
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
@@ -74,6 +80,7 @@ def test_demo_explanation_evidence_and_completion_loop_against_real_api():
     setup_showcase_in_normal_db(engine, service)
     application = create_app(database_engine=engine, ampa_service=service)
     with TestClient(application) as client:
+        sign_in_admin(client)
         explanation = client.get("/api/predictions/1/latest/explanation")
         assert explanation.status_code == 200, explanation.text
         payload = explanation.json()

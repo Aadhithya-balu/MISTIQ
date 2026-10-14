@@ -127,3 +127,31 @@ class Recommendation(Base):
     student: Mapped[Student] = relationship(back_populates="recommendations")
     prediction: Mapped[Prediction | None] = relationship(back_populates="recommendations")
     question: Mapped[Question | None] = relationship()
+
+
+class User(Base):
+    """Account used to sign in. ``role`` is either ``student`` or ``admin``.
+
+    A student account is linked to exactly one ``Student`` learning record; the
+    admin (operator) account has no linked student and can inspect read-only
+    research data such as the Research Lab and database inspector.
+    """
+
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="student")
+    student_id: Mapped[int | None] = mapped_column(ForeignKey("students.id"), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+
+class AuthSession(Base):
+    """Opaque bearer session token. Only a SHA-256 hash of the token is stored."""
+
+    __tablename__ = "auth_sessions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

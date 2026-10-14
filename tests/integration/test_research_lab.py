@@ -16,6 +16,12 @@ ROOT = Path(__file__).resolve().parents[2]
 ARTIFACT = ROOT / "backend" / "ml" / "artifacts" / "ampa.npz"
 
 
+def sign_in_admin(client):
+    response = client.post("/api/auth/login", json={"username": "admin", "password": "admin"})
+    assert response.status_code == 200, response.text
+    client.headers["Authorization"] = f"Bearer {response.json()['token']}"
+
+
 def setup_app():
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
@@ -33,6 +39,7 @@ def setup_app():
 def test_research_model_endpoint_returns_saved_parameters():
     app, service = setup_app()
     with TestClient(app) as client:
+        sign_in_admin(client)
         payload = client.get("/api/research/model").json()
         assert payload["training_status"] == "trained"
         assert payload["weights"] == service.model.weights_.tolist()
@@ -45,6 +52,7 @@ def test_research_model_endpoint_returns_saved_parameters():
 def test_formula_trace_replays_real_prediction_deterministically():
     app, service = setup_app()
     with TestClient(app) as client:
+        sign_in_admin(client)
         student = client.post("/api/students", json={"name": "Research learner"}).json()["id"]
         for index in range(5):
             response = client.post("/api/attempts", json={
@@ -105,6 +113,7 @@ def test_formula_trace_replays_real_prediction_deterministically():
 def test_phase_four_endpoints_report_real_files_and_absent_curve_honestly():
     app, _ = setup_app()
     with TestClient(app) as client:
+        sign_in_admin(client)
         comparison = client.get("/api/research/evaluation").json()
         ablations = client.get("/api/research/evaluation/ablations").json()
         calibration = client.get("/api/research/evaluation/calibration").json()
@@ -122,4 +131,5 @@ def test_phase_four_endpoints_report_real_files_and_absent_curve_honestly():
 def test_unknown_research_prediction_returns_404():
     app, _ = setup_app()
     with TestClient(app) as client:
+        sign_in_admin(client)
         assert client.get("/api/research/prediction/999/trace").status_code == 404

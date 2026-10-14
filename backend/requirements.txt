@@ -6,3 +6,7 @@ numpy==2.4.3
 scikit-learn==1.8.0
 pytest==9.1.1
 httpx==0.28.1
+
+# Optional Postgres/Supabase driver. Install only when you set DATABASE_URL to a
+# Postgres connection string:  pip install "psycopg[binary]"
+# Without it the app uses the local SQLite database at backend/mistiq.db.
