@@ -37,8 +37,9 @@ def create_app(database_engine=None, ampa_service=None) -> FastAPI:
         try:
             with session_factory() as session:
                 auth_service.ensure_admin(session, settings.admin_username, settings.admin_password)
+                auth_service.ensure_demo_student(session, "student", "student123", student_id=1)
         except Exception:
-            logger.exception("Admin account seeding failed")
+            logger.exception("Account seeding failed")
         service = ampa_service or AMPAService(settings.ampa_model_path)
         try:
             service.load_once()
