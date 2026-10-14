@@ -102,6 +102,29 @@ def ensure_admin(session: Session, username: str, password: str) -> User:
     return admin
 
 
+def ensure_demo_student(session: Session, username: str, password: str, student_id: int = 1) -> User:
+    """Idempotently create or update a demo student account linked to Student 1."""
+    existing = get_user_by_username(session, username)
+    if existing is not None:
+        updated = False
+        if existing.role != ROLE_STUDENT:
+            existing.role = ROLE_STUDENT
+            updated = True
+        if existing.student_id != student_id:
+            existing.student_id = student_id
+            updated = True
+        if updated:
+            session.commit()
+            session.refresh(existing)
+        return existing
+    user = User(username=normalize_username(username), password_hash=hash_password(password),
+                role=ROLE_STUDENT, student_id=student_id)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
 def user_view(session: Session, user: User) -> dict:
     name = None
     if user.student_id is not None:
