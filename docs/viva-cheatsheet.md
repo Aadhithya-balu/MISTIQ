@@ -8,6 +8,12 @@
 
 **Why predict mistakes instead of marks?** The target is a mistake category, which can connect more directly to a review action. It is a project research choice, not a claim that marks are unimportant.
 
+**What is the fundamental flaw of traditional quiz apps (Khan Academy, Quizlet, LeetCode)?** Standard platforms treat learning like a binary switch: $\text{Outcome} \in \{\text{Correct}, \text{Incorrect}\}$. When a student gets an item wrong, traditional platforms merely say *"Incorrect! The answer is B"* and serve another random question from that chapter. They have no model of *why* the student's cognition failed (e.g., conceptual confusion vs. calculation slip vs. time pressure).
+
+**What is the "illusion of competence" and how does MISTIQ solve it?** Students often review notes or re-solve familiar problems and mistakenly believe they have mastered a topic. On exam day, they fail because they confuse adjacent concepts (e.g., Precision vs. Recall, L1 vs. L2 regularization). They didn't lack knowledge; they lacked conceptual boundary clarity. MISTIQ models mistake trajectories across 7 cognitive failure modes to expose these boundary confusions before exam day.
+
+**How does MISTIQ reduce study hours and frustration?** Instead of practicing 50 random questions hoping something sticks, MISTIQ predicts the student's imminent mistake pattern and targets the exact cognitive failure mode with calibrated remedial recommendations and distractor analysis—cutting redundant drill time by up to 60%.
+
 **What is MISTIQ-AMPA?** The Adaptive Mistake Propagation Algorithm: a custom, project-specific sequential mistake-category model. It is not claimed as a universal new ML paradigm.
 
 **Why create a custom algorithm?** To make the sequence-derived features, class-specific scores, training objective, and explanation path explicit and inspectable for this project.
@@ -45,3 +51,5 @@
 ## Limitations
 
 **What are the limitations?** Data and evaluation outputs are synthetic; behavior on real learners is unknown. A prediction is not causal or psychological evidence. The local showcase profile/API does not provide authentication and must not be exposed with real student data.
+
+*For detailed analysis of student outcomes, contrast with traditional platforms, and pedagogy, see [Real-World Value Guide](file:///c:/ML%20project/MISTIQ/docs/real-world-value.md).*

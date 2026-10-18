@@ -6,7 +6,7 @@ import { getLatestPrediction, getLatestExplanation } from '../api/predictions'
 import { getNextRecommendation } from '../api/recommendations'
 import { getResearchEvaluation } from '../api/research'
 import { mistakeLabels } from '../constants/errorLabels'
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '../components'
+import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader, MLEngineHUD } from '../components'
 import type { MistakeEvent, Prediction, PredictionExplanation, Progress, RecommendedPractice } from '../types/entities'
 
 const errorMessage = (error: unknown) =>
@@ -275,6 +275,8 @@ export function DashboardPage() {
           </div>
           <div className="welcome-decoration" aria-hidden="true">✳</div>
         </Card>
+
+        {studentId > 0 && <MLEngineHUD studentId={studentId} />}
 
         {/* 1. Student Personal Progress Card */}
         <Card className="summary-card">

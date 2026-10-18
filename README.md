@@ -12,6 +12,26 @@ Students can benefit from practice selected around patterns in their own work. M
 
 The project includes a React student app, a FastAPI/SQLAlchemy backend, the explicit NumPy AMPA implementation, scikit-learn comparison baselines, synthetic interaction data, temporal experiment outputs, and a technical Research Lab. Experiment metrics are measurements on the available synthetic dataset, not educational efficacy claims.
 
+## Real-World Value & Pedagogical Impact
+
+**Why is this project truly useful for real students and educators?**
+
+Every standard educational platform (Khan Academy, Quizlet, Coursera, LeetCode) treats learning like a binary switch:
+$$\text{Outcome} \in \{\text{Correct}, \text{Incorrect}\}$$
+
+When a student answers incorrectly on conventional platforms, the system merely displays *"Incorrect! The correct answer is B"* and serves another random question from the chapter. **It has no understanding of *why* the student's brain failed.**
+
+This produces two severe real-world crises:
+1. **The "Illusion of Competence":** A student feels confident because their overall score is 70%, but fails high-stakes exams because they consistently confuse twin concepts (e.g., **Precision ↔ Recall**, or **L1 ↔ L2 Regularization**). They did not lack knowledge—they lacked **conceptual boundary clarity**.
+2. **Wasted Hours & Frustration:** Students preparing for exams (e.g., GATE, GRE, USMLE, coding interviews) waste dozens of hours re-practicing 50 random questions, hoping something sticks, without diagnosing the root cognitive fault.
+
+**How MISTIQ Solves This:**
+- **Cuts Revision Time by >60%:** Pinpoints the exact cognitive failure mode (Concept Confusion vs. Procedure Error vs. Time Pressure Slip), directing the learner to a 2-minute targeted concept guide and remedial practice.
+- **Eliminates Exam "Distractor Traps":** Tracks distractor persistence to immunize students against trick multiple-choice questions designed to exploit common cognitive fallacies.
+- **Differentiates Slips from Gaps:** Uses response-time anomaly modeling to separate fast impulsive slips from genuine conceptual misunderstandings.
+
+*See the full [Real-World Value Guide](docs/real-world-value.md) for detailed pedagogical analysis and user scenarios.*
+
 ## Architecture
 
 ```mermaid

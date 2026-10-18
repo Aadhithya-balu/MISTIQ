@@ -5,6 +5,7 @@ import { Icon, LoadingState, type IconName } from "../components"
 const studentNav: Array<{ to: string; label: string; icon: IconName }> = [
   { to: "/dashboard", label: "Dashboard", icon: "home" },
   { to: "/practice", label: "Practice", icon: "practice" },
+  { to: "/simulator", label: "ML Studio", icon: "formula" },
   { to: "/mistakes", label: "Mistakes", icon: "flag" },
   { to: "/progress", label: "Progress", icon: "chart" },
   { to: "/profile", label: "Profile", icon: "user" },
@@ -13,6 +14,7 @@ const studentNav: Array<{ to: string; label: string; icon: IconName }> = [
 const mobileNavStudent: Array<{ to: string; label: string; icon: IconName }> = [
   { to: "/dashboard", label: "Dashboard", icon: "home" },
   { to: "/practice", label: "Practice", icon: "practice" },
+  { to: "/simulator", label: "ML Studio", icon: "formula" },
   { to: "/mistakes", label: "Mistakes", icon: "flag" },
   { to: "/progress", label: "Progress", icon: "chart" },
   { to: "/profile", label: "Profile", icon: "user" },

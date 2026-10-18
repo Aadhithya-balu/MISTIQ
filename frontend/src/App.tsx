@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom"
 import AppLayout from "./layouts/AppLayout"
-import { DashboardPage, LoginPage, MistakesPage, PracticePage, ProgressPage, ProfilePage, ResearchPage } from "./pages/Pages"
+import { DashboardPage, LoginPage, MistakesPage, PracticePage, ProgressPage, ProfilePage, ResearchPage, MLStudioPage } from "./pages/Pages"
 import { useAuth } from "./context/AuthContext"
 
 function RequireAdmin({ children }: { children: JSX.Element }) {
@@ -20,6 +20,8 @@ export default function App() {
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/practice" element={<PracticePage />} />
+      <Route path="/simulator" element={<MLStudioPage />} />
+      <Route path="/ml-studio" element={<MLStudioPage />} />
       <Route path="/progress" element={<ProgressPage />} />
       <Route path="/mistakes" element={<MistakesPage />} />
       <Route path="/profile" element={<ProfilePage />} />
