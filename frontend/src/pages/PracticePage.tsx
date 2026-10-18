@@ -4,7 +4,8 @@ import { useStudent } from '../context/StudentContext'
 import { getQuestions } from '../api/questions'
 import { submitAttempt } from '../api/attempts'
 import { mistakeLabels } from '../constants/errorLabels'
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '../components'
+import { CONCEPT_GUIDES, getConceptGuide, type ConceptGuide } from '../constants/concepts'
+import { Button, Card, EmptyState, ErrorState, Icon, LoadingState, PageHeader } from '../components'
 import type { AttemptSubmission, OptionKey, Question } from '../types/entities'
 
 const optionKeys: OptionKey[] = ['A', 'B', 'C', 'D']
@@ -30,6 +31,11 @@ export function PracticePage() {
   const location = useLocation()
   const navigate = useNavigate()
 
+  // Mode: 'learn' (Concept Teaching) or 'quiz' (Interactive Testing)
+  const [activeTab, setActiveTab] = useState<'learn' | 'quiz'>('learn')
+  const [selectedConceptId, setSelectedConceptId] = useState<string>('Precision')
+  const [showInQuizHint, setShowInQuizHint] = useState<boolean>(false)
+
   const [allQuestions, setAllQuestions] = useState<Question[]>([])
   const [index, setIndex] = useState(0)
   const [selected, setSelected] = useState<OptionKey | null>(null)
@@ -49,11 +55,22 @@ export function PracticePage() {
   useEffect(() => {
     let active = true
     const params = new URLSearchParams(location.search)
-    const topic = params.get('topic') || undefined
-    const subtopic = params.get('subtopic') || undefined
+    const modeParam = params.get('mode')
+    const topicParam = params.get('topic') || undefined
+    const subtopicParam = params.get('subtopic') || undefined
     const requestedQuestionId = Number(params.get('question'))
 
-    getQuestions({ topic, subtopic })
+    if (modeParam === 'learn') {
+      setActiveTab('learn')
+    } else if (modeParam === 'quiz' || requestedQuestionId) {
+      setActiveTab('quiz')
+    }
+
+    if (topicParam) {
+      setSelectedConceptId(topicParam)
+    }
+
+    getQuestions({ topic: topicParam, subtopic: subtopicParam })
       .then(items => {
         if (!active) return
         setAllQuestions(items)
@@ -62,6 +79,9 @@ export function PracticePage() {
           if (matchIndex >= 0) {
             setIndex(matchIndex)
             setSessionLength(1)
+            if (items[matchIndex]?.topic) {
+              setSelectedConceptId(items[matchIndex].topic)
+            }
           }
         } else {
           setSessionLength(Math.min(5, Math.max(1, items.length)))
@@ -82,6 +102,13 @@ export function PracticePage() {
   }, [allQuestions, sessionLength])
 
   const question = questions[index]
+
+  // Update selected concept guide if question changes
+  useEffect(() => {
+    if (question?.topic && CONCEPT_GUIDES[question.topic]) {
+      setSelectedConceptId(question.topic)
+    }
+  }, [question?.topic])
 
   useEffect(() => {
     if (question && !result) {
@@ -110,7 +137,6 @@ export function PracticePage() {
       })
       setResult(response)
 
-      // Add to session records
       setSessionHistory(prev => [
         ...prev,
         {
@@ -139,23 +165,14 @@ export function PracticePage() {
     setSelected(null)
     setResult(null)
     setError('')
+    setShowInQuizHint(false)
     setStartedAt(Date.now())
   }, [index, questions.length])
-
-  const restartSession = useCallback(() => {
-    setSessionHistory([])
-    setSessionFinished(false)
-    setIndex(0)
-    setSelected(null)
-    setResult(null)
-    setError('')
-    setStartedAt(Date.now())
-  }, [])
 
   // Keyboard navigation support: 1/2/3/4 or A/B/C/D to pick, Enter to submit
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (sessionFinished) return
+      if (activeTab !== 'quiz' || sessionFinished) return
       if (result) {
         if (e.key === 'Enter') {
           e.preventDefault()
@@ -178,357 +195,527 @@ export function PracticePage() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [result, selected, submitting, nextQuestion, submit, sessionFinished])
+  }, [activeTab, result, selected, submitting, nextQuestion, submit, sessionFinished])
 
-  if (loading) {
-    return (
-      <>
-        <PageHeader title="Practice" description="Take your time. Each question is a chance to learn." />
-        <LoadingState label="Finding a question…" />
-      </>
-    )
-  }
+  const activeGuide: ConceptGuide = getConceptGuide(selectedConceptId)
 
-  if (error && !question) {
-    return (
-      <>
-        <PageHeader title="Practice" description="Take your time. Each question is a chance to learn." />
-        <ErrorState message={error} />
-      </>
-    )
-  }
-
-  if (!questions.length) {
-    return (
-      <>
-        <PageHeader title="Practice" description="Take your time. Each question is a chance to learn." />
-        <Card>
-          <EmptyState
-            title="No questions are available yet"
-            description="Once questions are added to the learning library, they will appear here."
-          />
-        </Card>
-      </>
-    )
-  }
-
-  // =========================================================================
-  // QUIZ COMPLETED / MARKS SUMMARY SCREEN
-  // =========================================================================
-  if (sessionFinished && sessionHistory.length > 0) {
-    const totalAnswered = sessionHistory.length
-    const totalCorrect = sessionHistory.filter(r => r.correct).length
-    const totalMistakes = totalAnswered - totalCorrect
-    const percentage = Math.round((totalCorrect / totalAnswered) * 100)
-    const totalTimeSeconds = Math.round((Date.now() - sessionStartTime) / 1000)
-    const minutes = Math.floor(totalTimeSeconds / 60)
-    const seconds = totalTimeSeconds % 60
-    const timeFormatted = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`
-
-    let ratingBadge = { label: 'Good Effort · Review Needed', color: 'badge-warning', tip: 'Mistakes are learning clues. Review the concepts below.' }
-    if (percentage === 100) {
-      ratingBadge = { label: 'Flawless Mastery! 🎉', color: 'badge-success', tip: 'Perfect accuracy. AMPA recorded high knowledge stability.' }
-    } else if (percentage >= 80) {
-      ratingBadge = { label: 'Great Work! 🌟', color: 'badge-success', tip: 'Strong conceptual clarity with minor review points.' }
-    } else if (percentage >= 60) {
-      ratingBadge = { label: 'Solid Progress 📚', color: 'badge-accent', tip: 'Good attempt. Targeted practice on missed concepts will solidify understanding.' }
+  const startQuizForConcept = (topic: string) => {
+    const matchIndex = allQuestions.findIndex(q => q.topic.toLowerCase() === topic.toLowerCase())
+    if (matchIndex >= 0) {
+      setIndex(matchIndex)
+      setSelected(null)
+      setResult(null)
     }
+    setActiveTab('quiz')
+  }
 
-    return (
-      <div className="quiz-results-view">
-        <PageHeader
-          title="Quiz Complete · Marks Summary"
-          description="Your attempt sequence has been processed by MISTIQ-AMPA. Here is your performance breakdown."
-        />
+  return (
+    <div className="practice-page-container">
+      <PageHeader
+        title="Learning & Practice Hub"
+        description="Master core concepts through interactive mental models, then validate your understanding with MISTIQ-AMPA adaptive testing."
+      />
 
-        <div className="results-grid">
-          {/* Main Marks Banner */}
-          <Card className="marks-banner-card">
-            <div className="marks-header">
-              <span className={`badge ${ratingBadge.color}`}>{ratingBadge.label}</span>
-              <span className="marks-time">Time spent: {timeFormatted}</span>
+      {/* Top Mode Selector Tabs */}
+      <div className="practice-mode-tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'learn'}
+          className={`mode-tab-button ${activeTab === 'learn' ? 'active' : ''}`}
+          onClick={() => setActiveTab('learn')}
+        >
+          <Icon name="book" />
+          <span>📖 Learn Concepts & Theory</span>
+          <span className="mode-tab-pill">Self-Paced Guide</span>
+        </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'quiz'}
+          className={`mode-tab-button ${activeTab === 'quiz' ? 'active' : ''}`}
+          onClick={() => setActiveTab('quiz')}
+        >
+          <Icon name="practice" />
+          <span>🎯 Practice & Knowledge Test</span>
+          <span className="mode-tab-pill">AMPA Tracked</span>
+        </button>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* VIEW 1: CONCEPT TEACHING & INTUITION GUIDE */}
+      {/* ========================================================================= */}
+      {activeTab === 'learn' && (
+        <div className="concept-teaching-view">
+          {/* Concept Topic Selector Pills */}
+          <div className="concept-selector-bar">
+            <span className="selector-label">Curriculum Topics:</span>
+            <div className="concept-pills-list">
+              {Object.keys(CONCEPT_GUIDES).map(key => {
+                const guide = CONCEPT_GUIDES[key]
+                const isCurrent = guide.id === activeGuide.id
+                return (
+                  <button
+                    key={guide.id}
+                    type="button"
+                    className={`concept-pill ${isCurrent ? 'active' : ''}`}
+                    onClick={() => setSelectedConceptId(guide.id)}
+                  >
+                    {guide.title}
+                  </button>
+                )
+              })}
             </div>
+          </div>
 
-            <div className="marks-display">
-              <div className="marks-score-circle">
-                <strong className="marks-number">{percentage}%</strong>
-                <span>Accuracy</span>
-              </div>
-              <div className="marks-breakdown">
-                <h2>{totalCorrect} of {totalAnswered} Correct</h2>
-                <p className="marks-tip">{ratingBadge.tip}</p>
-                <div className="marks-pill-row">
-                  <span className="marks-stat-pill pill-correct">
-                    ✓ {totalCorrect} Correct ({percentage} marks)
-                  </span>
-                  <span className="marks-stat-pill pill-review">
-                    ↳ {totalMistakes} Review Moments
-                  </span>
-                  <span className="marks-stat-pill pill-pace">
-                    ⏱ Avg {Math.round(totalTimeSeconds / totalAnswered)}s / question
-                  </span>
+          <div className="concept-layout">
+            <div className="concept-main-content">
+              {/* Concept Hero Header Card */}
+              <Card className="concept-hero-card">
+                <div className="concept-header-meta">
+                  <span className="badge badge-accent">{activeGuide.category}</span>
+                  <span className="concept-reading-time">⏱ ~3 min read</span>
                 </div>
+                <h2>{activeGuide.title}</h2>
+                <p className="concept-lead-summary">{activeGuide.summary}</p>
+
+                <div className="core-question-callout">
+                  <span className="core-q-label">Core Question to Ask:</span>
+                  <strong>"{activeGuide.coreQuestion}"</strong>
+                </div>
+
+                {activeGuide.formulaOrRule && (
+                  <div className="concept-formula-box">
+                    <span className="formula-tag">Mathematical Rule / Definition:</span>
+                    <code>{activeGuide.formulaOrRule}</code>
+                  </div>
+                )}
+              </Card>
+
+              {/* Side-by-Side Comparison Matrix */}
+              <Card className="concept-comparison-card">
+                <div className="card-kicker">Side-by-Side Mental Model</div>
+                <h3>Differentiating the Two Concepts</h3>
+                <p className="card-subtitle">
+                  This comparison resolves the exact misconception students struggle with in Machine Learning and Computer Science.
+                </p>
+
+                <div className="comparison-table-wrapper">
+                  <table className="comparison-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '22%' }}>Dimension</th>
+                        <th style={{ width: '39%' }} className="highlight-col-a">{activeGuide.comparison.termA}</th>
+                        <th style={{ width: '39%' }} className="highlight-col-b">{activeGuide.comparison.termB}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Meaning & Objective</strong></td>
+                        <td>{activeGuide.comparison.meaningA}</td>
+                        <td>{activeGuide.comparison.meaningB}</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Real-World Example</strong></td>
+                        <td><em>{activeGuide.comparison.exampleA}</em></td>
+                        <td><em>{activeGuide.comparison.exampleB}</em></td>
+                      </tr>
+                      <tr>
+                        <td><strong>When to Prioritize</strong></td>
+                        <td><span className="badge badge-success">{activeGuide.comparison.whenToUseA}</span></td>
+                        <td><span className="badge badge-accent">{activeGuide.comparison.whenToUseB}</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+
+              {/* MISTIQ Pattern Trap & Memory Hook */}
+              <div className="concept-dual-insights">
+                <Card className="insight-card trap-card">
+                  <div className="insight-badge trap-badge">
+                    <Icon name="alert" />
+                    <span>Why Students Confuse This</span>
+                  </div>
+                  <h4>The Common Trap</h4>
+                  <p>{activeGuide.commonPitfall}</p>
+                  <div className="insight-deep-dive">
+                    <strong>MISTIQ-AMPA Insight:</strong>
+                    <span>{activeGuide.keyInsight}</span>
+                  </div>
+                </Card>
+
+                <Card className="insight-card memory-card">
+                  <div className="insight-badge memory-badge">
+                    <Icon name="lightbulb" />
+                    <span>Memory Hook & Rule of Thumb</span>
+                  </div>
+                  <h4>How to Remember</h4>
+                  <p className="memory-hook-text">{activeGuide.memoryHook}</p>
+                  <div className="ready-quiz-box">
+                    <span>Understood the concept?</span>
+                    <Button onClick={() => startQuizForConcept(activeGuide.id)}>
+                      Test this in Quiz Mode <span aria-hidden="true">→</span>
+                    </Button>
+                  </div>
+                </Card>
               </div>
             </div>
 
-            <div className="marks-actions">
-              <Button onClick={() => navigate('/dashboard')}>
-                View Updated Dashboard <span aria-hidden="true">→</span>
-              </Button>
-              <Button className="button-secondary" onClick={restartSession}>
-                Practice Another Quiz Session
-              </Button>
-              <Link className="text-link" to="/mistakes" style={{ marginLeft: 'auto' }}>
-                Review Mistakes Hub <span aria-hidden="true">→</span>
-              </Link>
-            </div>
-          </Card>
+            {/* Sidebar Guide Summary */}
+            <aside className="concept-aside">
+              <Card className="concept-aside-card">
+                <span className="aside-mark" aria-hidden="true">📖</span>
+                <h3>Concept Guide</h3>
+                <p>Studying the theoretical distinction before taking questions prevents cognitive mistake reinforcement.</p>
+                <div className="aside-rule" />
+                <span className="aside-label">CURRENT CONCEPT</span>
+                <strong>{activeGuide.title}</strong>
+                <div style={{ marginTop: '14px' }}>
+                  <span className="aside-label">AVAILABLE PRACTICE</span>
+                  <strong>
+                    {allQuestions.filter(q => q.topic.toLowerCase() === activeGuide.id.toLowerCase()).length || 2} questions in bank
+                  </strong>
+                </div>
+                <div style={{ marginTop: '18px' }}>
+                  <Button className="button-secondary full-width" onClick={() => startQuizForConcept(activeGuide.id)}>
+                    Jump to Practice Quiz
+                  </Button>
+                </div>
+              </Card>
+            </aside>
+          </div>
+        </div>
+      )}
 
-          {/* AMPA Intelligence Insight Card */}
-          <Card className="ampa-update-card">
-            <div className="card-kicker">MISTIQ-AMPA Live Update</div>
-            <h3>Sequential Model Adaptation</h3>
-            <p className="body-copy">
-              {totalMistakes === 0
-                ? 'Your sequential mistake momentum remained at zero. Learning stability was reinforced across the attempted topics.'
-                : `AMPA identified ${totalMistakes} mistake event${totalMistakes > 1 ? 's' : ''} in this sequence. Distractor patterns and recency weights have been recalculated to adapt your next recommendation.`}
-            </p>
-          </Card>
+      {/* ========================================================================= */}
+      {/* VIEW 2: INTERACTIVE PRACTICE & QUIZ */}
+      {/* ========================================================================= */}
+      {activeTab === 'quiz' && (
+        <>
+          {loading && <LoadingState label="Finding question…" />}
 
-          {/* Question by Question Detailed Marks Review */}
-          <Card className="question-review-card">
-            <div className="section-heading">
-              <div>
-                <div className="card-kicker">Detailed Breakdown</div>
-                <h3>Question-by-Question Review</h3>
-              </div>
-              <span className="badge">{totalAnswered} Questions Reviewed</span>
-            </div>
+          {error && !question && <ErrorState message={error} />}
 
-            <div className="review-list">
-              {sessionHistory.map((rec, i) => (
-                <div
-                  key={rec.question.question_id}
-                  className={`review-item ${rec.correct ? 'review-item-correct' : 'review-item-incorrect'}`}
-                >
-                  <div className="review-item-header">
-                    <span className="review-q-num">Q{i + 1}</span>
-                    <span className="crumb">{rec.question.topic}{rec.question.subtopic ? ` · ${rec.question.subtopic}` : ''}</span>
-                    <span className={`review-status-tag ${rec.correct ? 'tag-correct' : 'tag-incorrect'}`}>
-                      {rec.correct ? '✓ Correct' : '✗ Incorrect'}
+          {!loading && !questions.length && (
+            <Card>
+              <EmptyState
+                title="No questions are available yet"
+                description="Once questions are added to the learning library, they will appear here."
+              />
+            </Card>
+          )}
+
+          {/* QUIZ COMPLETED / MARKS SUMMARY SCREEN */}
+          {!loading && sessionFinished && sessionHistory.length > 0 && (
+            <div className="quiz-results-view">
+              <PageHeader
+                title="Quiz Complete · Marks Summary"
+                description="Your attempt sequence has been processed by MISTIQ-AMPA. Here is your performance breakdown."
+              />
+
+              <div className="results-grid">
+                <Card className="marks-banner-card">
+                  <div className="marks-header">
+                    <span className="badge badge-success">Quiz Finished!</span>
+                    <span className="marks-time">
+                      Score: {sessionHistory.filter(r => r.correct).length} / {sessionHistory.length}
                     </span>
                   </div>
 
-                  <p className="review-question-text">{rec.question.question_text}</p>
-
-                  <div className="review-answers-box">
-                    <div className="review-user-answer">
-                      <span>Your choice:</span>
-                      <strong>
-                        Option {rec.selectedOption}: {optionText(rec.question, rec.selectedOption)}
-                      </strong>
+                  <div className="marks-body">
+                    <div className="marks-big-number">
+                      {Math.round((sessionHistory.filter(r => r.correct).length / sessionHistory.length) * 100)}%
                     </div>
-
-                    {!rec.correct && (
-                      <div className="review-correct-answer">
-                        <span>Correct answer:</span>
-                        <strong>
-                          Option {rec.correctOption}: {rec.correctAnswer}
-                        </strong>
-                      </div>
-                    )}
+                    <div className="marks-details">
+                      <h3>
+                        {sessionHistory.filter(r => r.correct).length} of {sessionHistory.length} answered correctly
+                      </h3>
+                      <p>
+                        {sessionHistory.some(r => !r.correct)
+                          ? 'You can review the conceptual distinctions below or revisit the Concept Guide.'
+                          : 'Outstanding! Full accuracy on this practice session.'}
+                      </p>
+                    </div>
                   </div>
 
-                  {rec.mistakeType && (
-                    <div className="review-mistake-note">
-                      <span className="badge badge-warning">
-                        Pattern: {mistakeLabels[rec.mistakeType as keyof typeof mistakeLabels] || rec.mistakeType}
-                      </span>
-                      {rec.mistakeType === 'CONCEPT_CONFUSION' && (
-                        <span className="review-subnote">
-                          Concept distinction: {rec.question.subtopic || rec.question.topic} ↔ {optionText(rec.question, rec.selectedOption)}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-
-  // =========================================================================
-  // ACTIVE QUESTION SCREEN
-  // =========================================================================
-  const difficultyLabels = ['Very easy', 'Easy', 'Medium', 'Hard', 'Very hard']
-  const difficulty = difficultyLabels[question.difficulty - 1] || 'Medium'
-  const isLastQuestion = index + 1 >= questions.length
-  const answeredCount = sessionHistory.length
-  const correctCount = sessionHistory.filter(r => r.correct).length
-
-  return (
-    <>
-      <PageHeader
-        title="Practice Session"
-        description="Take your time. Each question is analyzed chronologically by MISTIQ."
-      />
-
-      {/* Session Progress Header */}
-      <div className="quiz-session-header">
-        <div className="session-tracker">
-          <div className="session-progress-info">
-            <span className="session-q-counter">
-              Question <strong>{index + 1}</strong> of <strong>{questions.length}</strong>
-            </span>
-            {answeredCount > 0 && (
-              <span className="session-live-score">
-                Current score: <strong>{correctCount} / {answeredCount}</strong> correct
-              </span>
-            )}
-          </div>
-          <div className="session-bar-track">
-            <span
-              className="session-bar-fill"
-              style={{ width: `${Math.round(((index + (result ? 1 : 0)) / questions.length) * 100)}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="practice-layout">
-        <div className="practice-main">
-          <div className="practice-meta">
-            <span className="crumb">{question.topic}{question.subtopic ? ` / ${question.subtopic}` : ''}</span>
-            <span className="badge badge-accent difficulty-tag">Difficulty {question.difficulty} · {difficulty}</span>
-          </div>
-
-          <Card className="question-card">
-            <div className="question-count">
-              QUESTION {String(index + 1).padStart(2, '0')} <span>·</span> {question.estimated_time} sec guide
-            </div>
-            <h2>{question.question_text}</h2>
-
-            <fieldset className="answer-list" disabled={!!result || submitting}>
-              <legend className="sr-only">Choose one answer</legend>
-              {optionKeys.map(key => {
-                const isSelected = selected === key
-                const isCorrect = result?.correct_option === key
-                const isIncorrectSelection = result && isSelected && !result.attempt.correct
-                return (
-                  <label
-                    key={key}
-                    className={`answer-option ${isSelected ? 'selected' : ''} ${isCorrect ? 'answer-correct' : ''} ${isIncorrectSelection ? 'answer-incorrect' : ''}`}
-                  >
-                    <input
-                      type="radio"
-                      name="answer"
-                      value={key}
-                      aria-label={`${key}. ${optionText(question, key)}`}
-                      checked={isSelected}
-                      onChange={() => setSelected(key)}
-                    />
-                    <span className="option-key" aria-hidden="true">{key}</span>
-                    <span className="option-text">{optionText(question, key)}</span>
-                    {isCorrect && <span className="answer-mark">Correct answer</span>}
-                  </label>
-                )
-              })}
-            </fieldset>
-
-            {error && <ErrorState message={error} />}
-
-            {!result ? (
-              <div className="question-actions">
-                <span className="quiet-note">
-                  Press 1-4 or A-D to select, Enter to check answer.
-                </span>
-                <Button onClick={submit} disabled={!selected || submitting}>
-                  {submitting ? 'Checking…' : 'Submit answer'} <span aria-hidden="true">→</span>
-                </Button>
-              </div>
-            ) : (
-              <div
-                ref={feedbackRef}
-                tabIndex={-1}
-                className={`feedback-panel ${result.attempt.correct ? 'feedback-good' : 'feedback-review'}`}
-                role="status"
-              >
-                <span className="feedback-icon" aria-hidden="true">
-                  {result.attempt.correct ? '✓' : '↳'}
-                </span>
-                <div>
-                  <h3>{result.attempt.correct ? 'Correct.' : 'Not quite.'}</h3>
-                  <p>
-                    The correct answer is <strong>{result.correct_option}. {result.correct_answer}</strong>
-                  </p>
-
-                  {result.mistake_event?.error_type === 'CONCEPT_CONFUSION' && (
-                    <div className="aha-card">
-                      <div className="card-kicker">A pattern MISTIQ noticed</div>
-                      <strong>Concept confusion</strong>
-                      <p className="confusion-pair">
-                        {question.subtopic || question.topic} ↔ {optionText(question, result.attempt.selected_option)}
-                      </p>
-                      <p>Your answer connects two related concepts. Practicing this distinction can help make the difference clearer.</p>
-                      <Link className="button button-secondary" to={`/practice?topic=${encodeURIComponent(question.topic)}`}>
-                        Practice this concept
-                      </Link>
-                    </div>
-                  )}
-
-                  {result.mistake_event && (
-                    <p>
-                      This looks like a <strong>{mistakeLabels[result.mistake_event.error_type]?.toLowerCase()}</strong> in {result.mistake_event.subtopic || result.mistake_event.topic}. A good concept to revisit.
-                    </p>
-                  )}
-
-                  {!result.mistake_event && (
-                    <p>Keep building on what you know about {question.subtopic || question.topic}.</p>
-                  )}
-
-                  {result.prediction && (
-                    <p className="feedback-prediction">
-                      A possible next challenge: {mistakeLabels[result.prediction.prediction]?.toLowerCase() || result.prediction.prediction}.
-                    </p>
-                  )}
-
-                  {!result.prediction && (
-                    <p className="quiet-note">
-                      {result.prediction_status === 'NO_RELIABLE_PREDICTION'
-                        ? 'A few more practice answers will help MISTIQ spot useful patterns.'
-                        : 'Your attempt and learning progress have been saved.'}
-                    </p>
-                  )}
-
-                  <div style={{ display: 'flex', gap: '10px', marginTop: '14px', alignItems: 'center' }}>
-                    <Button className="button-secondary" onClick={nextQuestion}>
-                      {isLastQuestion ? 'Complete Quiz & View Marks' : 'Next question'} <span aria-hidden="true">→</span>
+                  <div className="marks-actions" style={{ display: 'flex', gap: '12px', marginTop: '18px' }}>
+                    <Button onClick={() => setActiveTab('learn')}>
+                      📖 Review Concept Lessons
+                    </Button>
+                    <Button className="button-secondary" onClick={() => {
+                      setIndex(0)
+                      setSelected(null)
+                      setResult(null)
+                      setSessionHistory([])
+                      setSessionFinished(false)
+                    }}>
+                      🔄 Retake Practice
                     </Button>
                   </div>
+                </Card>
+
+                {/* Question Review List */}
+                <Card className="review-breakdown-card">
+                  <h3>Question-by-Question Review</h3>
+                  <div className="review-list">
+                    {sessionHistory.map((rec, i) => (
+                      <div key={i} className={`review-item ${rec.correct ? 'review-correct' : 'review-incorrect'}`}>
+                        <div className="review-item-header">
+                          <span className="review-q-num">Q{i + 1}</span>
+                          <span className={`badge ${rec.correct ? 'badge-success' : 'badge-danger'}`}>
+                            {rec.correct ? 'Correct' : 'Needs Review'}
+                          </span>
+                          <span className="review-time">{rec.responseTime}s</span>
+                        </div>
+                        <p className="review-question-text">{rec.question.question_text}</p>
+                        <div className="review-answer-row">
+                          <span>Your answer: <strong>Option {rec.selectedOption}: {optionText(rec.question, rec.selectedOption)}</strong></span>
+                          {!rec.correct && (
+                            <span className="review-expected">
+                              Correct: <strong>Option {rec.correctOption}: {rec.correctAnswer}</strong>
+                            </span>
+                          )}
+                        </div>
+                        {!rec.correct && rec.mistakeType && (
+                          <div className="review-remediation">
+                            <span className="remediation-tag">MISTIQ Pattern: {mistakeLabels[rec.mistakeType as keyof typeof mistakeLabels] || rec.mistakeType}</span>
+                            <button
+                              type="button"
+                              className="text-link-button"
+                              onClick={() => {
+                                setSelectedConceptId(rec.question.topic)
+                                setActiveTab('learn')
+                              }}
+                            >
+                              Study {rec.question.topic} concept lesson →
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {/* ACTIVE QUESTION SCREEN */}
+          {!loading && !sessionFinished && question && (
+            <>
+              {/* Session Progress Header */}
+              <div className="quiz-session-header">
+                <div className="session-tracker">
+                  <div className="session-progress-info">
+                    <span className="session-q-counter">
+                      Question <strong>{index + 1}</strong> of <strong>{questions.length}</strong>
+                    </span>
+                    {sessionHistory.length > 0 && (
+                      <span className="session-live-score">
+                        Current score: <strong>{sessionHistory.filter(r => r.correct).length} / {sessionHistory.length}</strong> correct
+                      </span>
+                    )}
+                  </div>
+                  <div className="session-bar-track">
+                    <span
+                      className="session-bar-fill"
+                      style={{ width: `${Math.round(((index + (result ? 1 : 0)) / questions.length) * 100)}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-            )}
-          </Card>
-        </div>
 
-        <aside className="practice-aside">
-          <Card>
-            <span className="aside-mark" aria-hidden="true">✳</span>
-            <h3>Quiz Session</h3>
-            <p>Give each question a thoughtful try. After completing this session, your marks and sequential insights will be presented.</p>
-            <div className="aside-rule" />
-            <span className="aside-label">IN THIS QUIZ</span>
-            <strong>{questions.length} questions total</strong>
-            <div style={{ marginTop: '12px' }}>
-              <span className="aside-label">ANSWERED SO FAR</span>
-              <strong>{answeredCount} of {questions.length}</strong>
-            </div>
-          </Card>
-        </aside>
-      </div>
-    </>
+              <div className="practice-layout">
+                <div className="practice-main">
+                  <div className="practice-meta">
+                    <span className="crumb">{question.topic}{question.subtopic ? ` / ${question.subtopic}` : ''}</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        className="hint-toggle-btn"
+                        onClick={() => setShowInQuizHint(prev => !prev)}
+                        title="Toggle Concept Primer"
+                      >
+                        <Icon name="lightbulb" />
+                        <span>{showInQuizHint ? 'Hide Concept Primer' : '💡 Concept Primer'}</span>
+                      </button>
+                      <span className="badge badge-accent difficulty-tag">Difficulty {question.difficulty}</span>
+                    </div>
+                  </div>
+
+                  {/* Expandable In-Quiz Concept Primer Drawer */}
+                  {showInQuizHint && (
+                    <div className="in-quiz-concept-drawer">
+                      <div className="drawer-header">
+                        <strong>💡 Concept Primer: {getConceptGuide(question.topic).title}</strong>
+                        <button type="button" className="drawer-close" onClick={() => setShowInQuizHint(false)}>✕</button>
+                      </div>
+                      <p className="drawer-summary">{getConceptGuide(question.topic).summary}</p>
+                      <div className="drawer-rule">
+                        <strong>Core Rule:</strong> {getConceptGuide(question.topic).formulaOrRule || getConceptGuide(question.topic).keyInsight}
+                      </div>
+                      <div className="drawer-footer">
+                        <button
+                          type="button"
+                          className="text-link-button"
+                          onClick={() => {
+                            setSelectedConceptId(question.topic)
+                            setActiveTab('learn')
+                          }}
+                        >
+                          Open full concept lesson & comparison table →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <Card className="question-card">
+                    <div className="question-count">
+                      QUESTION {String(index + 1).padStart(2, '0')} <span>·</span> {question.estimated_time} sec guide
+                    </div>
+                    <h2>{question.question_text}</h2>
+
+                    <fieldset className="answer-list" disabled={!!result || submitting}>
+                      <legend className="sr-only">Choose one answer</legend>
+                      {optionKeys.map(key => {
+                        const isSelected = selected === key
+                        const isCorrect = result?.correct_option === key
+                        const isIncorrectSelection = result && isSelected && !result.attempt.correct
+                        return (
+                          <label
+                            key={key}
+                            className={`answer-option ${isSelected ? 'selected' : ''} ${isCorrect ? 'answer-correct' : ''} ${isIncorrectSelection ? 'answer-incorrect' : ''}`}
+                          >
+                            <input
+                              type="radio"
+                              name="answer"
+                              value={key}
+                              aria-label={`${key}. ${optionText(question, key)}`}
+                              checked={isSelected}
+                              onChange={() => setSelected(key)}
+                            />
+                            <span className="option-key" aria-hidden="true">{key}</span>
+                            <span className="option-text">{optionText(question, key)}</span>
+                            {isCorrect && <span className="answer-mark">Correct answer</span>}
+                          </label>
+                        )
+                      })}
+                    </fieldset>
+
+                    {error && <ErrorState message={error} />}
+
+                    {!result ? (
+                      <div className="question-actions">
+                        <span className="quiet-note">
+                          Press 1-4 or A-D to select, Enter to check answer.
+                        </span>
+                        <Button onClick={submit} disabled={!selected || submitting}>
+                          {submitting ? 'Checking…' : 'Submit answer'} <span aria-hidden="true">→</span>
+                        </Button>
+                      </div>
+                    ) : (
+                      <div
+                        ref={feedbackRef}
+                        tabIndex={-1}
+                        className={`feedback-panel ${result.attempt.correct ? 'feedback-good' : 'feedback-review'}`}
+                        role="status"
+                      >
+                        <span className="feedback-icon" aria-hidden="true">
+                          {result.attempt.correct ? '✓' : '↳'}
+                        </span>
+                        <div>
+                          <h3>{result.attempt.correct ? 'Correct! Well done.' : 'Not quite.'}</h3>
+                          <p>
+                            The correct answer is <strong>{result.correct_option}. {result.correct_answer}</strong>
+                          </p>
+
+                          {result.mistake_event?.error_type === 'CONCEPT_CONFUSION' && (
+                            <div className="aha-card">
+                              <div className="card-kicker">A pattern MISTIQ noticed</div>
+                              <strong>Concept Confusion Detected</strong>
+                              <p className="confusion-pair">
+                                {question.subtopic || question.topic} ↔ {optionText(question, result.attempt.selected_option)}
+                              </p>
+                              <p>Your choice links two closely related concepts that are commonly confused.</p>
+                              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                                <Button
+                                  onClick={() => {
+                                    setSelectedConceptId(question.topic)
+                                    setActiveTab('learn')
+                                  }}
+                                >
+                                  📖 Learn {question.topic} Concept Guide
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {result.mistake_event && result.mistake_event.error_type !== 'CONCEPT_CONFUSION' && (
+                            <div className="aha-card">
+                              <strong>{mistakeLabels[result.mistake_event.error_type]}</strong> in {result.mistake_event.topic}.
+                              <p>Reviewing the underlying principles will help avoid this mistake pattern in future practice.</p>
+                              <div style={{ marginTop: '8px' }}>
+                                <button
+                                  type="button"
+                                  className="text-link-button"
+                                  onClick={() => {
+                                    setSelectedConceptId(question.topic)
+                                    setActiveTab('learn')
+                                  }}
+                                >
+                                  Read {question.topic} concept notes →
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {result.prediction && (
+                            <p className="feedback-prediction">
+                              MISTIQ-AMPA predicted next area to watch: {mistakeLabels[result.prediction.prediction]?.toLowerCase() || result.prediction.prediction}.
+                            </p>
+                          )}
+
+                          <div style={{ display: 'flex', gap: '10px', marginTop: '16px', alignItems: 'center' }}>
+                            <Button className="button-secondary" onClick={nextQuestion}>
+                              {index + 1 >= questions.length ? 'Complete Quiz & View Marks' : 'Next question'} <span aria-hidden="true">→</span>
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                </div>
+
+                <aside className="practice-aside">
+                  <Card>
+                    <span className="aside-mark" aria-hidden="true">🎯</span>
+                    <h3>Active Quiz</h3>
+                    <p>Give each question a thoughtful try. MISTIQ models your chronological error trajectory.</p>
+                    <div className="aside-rule" />
+                    <span className="aside-label">IN THIS QUIZ</span>
+                    <strong>{questions.length} questions</strong>
+                    <div style={{ marginTop: '12px' }}>
+                      <span className="aside-label">NEED THEORY?</span>
+                      <button
+                        type="button"
+                        className="text-link-button"
+                        style={{ marginTop: '4px', display: 'block' }}
+                        onClick={() => {
+                          setSelectedConceptId(question.topic)
+                          setActiveTab('learn')
+                        }}
+                      >
+                        📖 Switch to Concept Lesson
+                      </button>
+                    </div>
+                  </Card>
+                </aside>
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
   )
 }

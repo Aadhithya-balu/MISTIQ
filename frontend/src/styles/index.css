@@ -1176,6 +1176,436 @@ ul { list-style: none; }
   margin-top: 10px;
 }
 
+/* ============================================================= Concept Teaching & Practice Tabs */
+.practice-mode-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.mode-tab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  color: var(--ink-2);
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .16s ease;
+}
+
+.mode-tab-button:hover {
+  background: var(--surface-2);
+  border-color: var(--accent-line);
+  color: var(--ink);
+}
+
+.mode-tab-button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.mode-tab-pill {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  color: inherit;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.mode-tab-button.active .mode-tab-pill {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Concept Selector Bar */
+.concept-selector-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+
+.selector-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+
+.concept-pills-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.concept-pill {
+  padding: 6px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .14s ease;
+}
+
+.concept-pill:hover {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: #fff;
+}
+
+.concept-pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Concept Teaching Layout */
+.concept-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 22px;
+  align-items: start;
+}
+
+.concept-main-content {
+  display: grid;
+  gap: 20px;
+}
+
+.concept-hero-card {
+  padding: 26px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--line);
+}
+
+.concept-header-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.concept-reading-time {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.concept-hero-card h2 {
+  font-size: 24px;
+  margin: 0 0 10px;
+  letter-spacing: -.02em;
+}
+
+.concept-lead-summary {
+  font-size: 15.5px;
+  color: var(--ink-2);
+  line-height: 1.6;
+  margin: 0 0 18px;
+}
+
+.core-question-callout {
+  padding: 14px 18px;
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  margin-bottom: 16px;
+}
+
+.core-q-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-weight: 700;
+  color: var(--accent-ink);
+  margin-bottom: 4px;
+}
+
+.core-question-callout strong {
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.concept-formula-box {
+  padding: 12px 16px;
+  background: #1e1e24;
+  color: #e2e8f0;
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formula-tag {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.concept-formula-box code {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: #38bdf8;
+  word-break: break-word;
+}
+
+/* Comparison Matrix */
+.concept-comparison-card {
+  padding: 24px;
+}
+
+.comparison-table-wrapper {
+  overflow-x: auto;
+  margin-top: 14px;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.comparison-table th, .comparison-table td {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  vertical-align: top;
+  text-align: left;
+}
+
+.comparison-table th {
+  background: var(--surface-3);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.highlight-col-a {
+  background: #eef2ff !important;
+  color: var(--accent-ink) !important;
+}
+
+.highlight-col-b {
+  background: #ecfdf5 !important;
+  color: #065f46 !important;
+}
+
+/* Dual Insights: Pitfall & Memory */
+.concept-dual-insights {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.insight-card {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.trap-card {
+  border-left: 4px solid var(--danger);
+  background: #fffafa;
+}
+
+.memory-card {
+  border-left: 4px solid var(--success);
+  background: #f8fdf9;
+}
+
+.insight-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.trap-badge { color: var(--danger); }
+.memory-badge { color: var(--success); }
+
+.insight-card h4 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.insight-card p {
+  font-size: 13.5px;
+  color: var(--ink-2);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.insight-deep-dive {
+  margin-top: auto;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.memory-hook-text {
+  font-size: 14.5px !important;
+  font-weight: 600;
+  color: var(--ink) !important;
+  background: rgba(21, 115, 71, 0.08);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+}
+
+.ready-quiz-box {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ready-quiz-box span {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.concept-aside-card {
+  position: sticky;
+  top: 24px;
+  padding: 20px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+/* In-Quiz Concept Primer Drawer */
+.hint-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all .14s ease;
+}
+
+.hint-toggle-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.in-quiz-concept-drawer {
+  padding: 16px 20px;
+  background: #fbfbfe;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeIn .18s ease;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.drawer-header strong {
+  color: var(--accent-ink);
+  font-size: 14px;
+}
+
+.drawer-close {
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.drawer-summary {
+  font-size: 13.5px;
+  color: var(--ink-2);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.drawer-rule {
+  font-size: 13px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-xs);
+  color: var(--ink);
+}
+
+.drawer-footer {
+  margin-top: 4px;
+}
+
+.text-link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.text-link-button:hover {
+  color: var(--accent-strong);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 860px) {
+  .concept-layout { grid-template-columns: 1fr; }
+  .concept-dual-insights { grid-template-columns: 1fr; }
+  .practice-mode-tabs { flex-direction: column; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+

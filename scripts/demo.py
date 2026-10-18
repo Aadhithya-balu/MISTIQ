@@ -64,6 +64,8 @@ def main() -> None:
     application = create_app(database_engine=engine, ampa_service=service)
 
     with TestClient(application) as client:
+        login_res = _check(client.post("/api/auth/login", json={"username": "admin", "password": "admin"}))
+        client.headers["Authorization"] = f"Bearer {login_res['token']}"
         assert _check(client.get("/health"))["status"] == "ok"
         assert service.model is not None and service.model.fitted_
         student = _check(client.post("/api/students", json={"name": "MISTIQ demo learner"}), (201,))

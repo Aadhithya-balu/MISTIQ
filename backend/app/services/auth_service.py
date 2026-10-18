@@ -104,6 +104,11 @@ def ensure_admin(session: Session, username: str, password: str) -> User:
 
 def ensure_demo_student(session: Session, username: str, password: str, student_id: int = 1) -> User:
     """Idempotently create or update a demo student account linked to Student 1."""
+    student = session.get(Student, student_id)
+    if student is None:
+        student = Student(id=student_id, name="Demo Student")
+        session.add(student)
+        session.flush()
     existing = get_user_by_username(session, username)
     if existing is not None:
         updated = False

@@ -65,6 +65,11 @@ function PredictionCard({
               <span>Data reliability <strong>{(prediction.reliability * 100).toFixed(0)}%</strong></span>
             </div>
           )}
+          <div style={{ marginTop: '10px' }}>
+            <Link className="text-link" to={`/practice?topic=${encodeURIComponent(explanation?.learning_need?.[0] || 'Precision')}&mode=learn`}>
+              📖 Study {explanation?.learning_need?.[0] || 'this concept'} lesson & notes →
+            </Link>
+          </div>
         </div>
       </div>
       {explanation && (
@@ -116,9 +121,14 @@ function RecommendationCard({ recommendation }: { recommendation: RecommendedPra
       <p className="recommendation-detail">
         Difficulty {recommendation.question.difficulty} of 5 · {recommendation.question.estimated_time} sec guide
       </p>
-      <Link className="text-link" to={`/practice?question=${recommendation.question.question_id}`}>
-        Try this question <span aria-hidden="true">→</span>
-      </Link>
+      <div style={{ display: 'flex', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
+        <Link className="button button-secondary" to={`/practice?topic=${encodeURIComponent(recommendation.question.topic)}&mode=learn`}>
+          📖 Study Concept Guide
+        </Link>
+        <Link className="button" to={`/practice?question=${recommendation.question.question_id}&mode=quiz`}>
+          🎯 Take Practice Quiz →
+        </Link>
+      </div>
     </Card>
   )
 }
