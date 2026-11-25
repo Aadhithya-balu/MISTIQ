@@ -21,7 +21,7 @@ import {
   type DatabaseInspection,
   type ShowcaseStatus,
 } from '../api/showcase'
-import { Card, PageHeader } from '../components'
+import { Card, PageHeader, MLEngineHUD } from '../components'
 import { mistakeLabels } from '../constants/errorLabels'
 import type { ErrorType } from '../types/entities'
 
@@ -237,7 +237,11 @@ export function ResearchPage({
       {error && <p className="error research-error" role="alert">{error}</p>}
 
       {mode === 'overview' && (
-        <div className="research-grid">
+        <>
+          <div style={{ marginBottom: '20px' }}>
+            <MLEngineHUD studentId={Number(lookupStudentId) || 1} />
+          </div>
+          <div className="research-grid">
           <Card className="research-wide">
             <div className="card-kicker">MISTIQ-AMPA · {model?.model_version ?? '…'}</div>
             <h2>Adaptive Mistake Propagation Algorithm</h2>
@@ -293,6 +297,7 @@ export function ResearchPage({
             </p>
           </Card>
         </div>
+        </>
       )}
 
       {mode === 'showcase' && (

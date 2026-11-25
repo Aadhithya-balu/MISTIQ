@@ -20,8 +20,8 @@ export default function App() {
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/practice" element={<PracticePage />} />
-      <Route path="/simulator" element={<MLStudioPage />} />
-      <Route path="/ml-studio" element={<MLStudioPage />} />
+      <Route path="/simulator" element={<RequireAdmin><MLStudioPage /></RequireAdmin>} />
+      <Route path="/ml-studio" element={<RequireAdmin><MLStudioPage /></RequireAdmin>} />
       <Route path="/progress" element={<ProgressPage />} />
       <Route path="/mistakes" element={<MistakesPage />} />
       <Route path="/profile" element={<ProfilePage />} />
@@ -33,4 +33,3 @@ export default function App() {
     </Route>
   </Routes>
 }
-

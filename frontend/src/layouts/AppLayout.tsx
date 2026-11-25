@@ -2,22 +2,20 @@ import { NavLink, Navigate, Outlet, useLocation } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { Icon, LoadingState, type IconName } from "../components"
 
-const studentNav: Array<{ to: string; label: string; icon: IconName }> = [
+const studentNav: Array<{ to: string; label: string; icon: IconName; end?: boolean }> = [
   { to: "/dashboard", label: "Dashboard", icon: "home" },
   { to: "/practice", label: "Practice", icon: "practice" },
-  { to: "/simulator", label: "ML Studio", icon: "formula" },
-  { to: "/mistakes", label: "Mistakes", icon: "flag" },
+  { to: "/mistakes", label: "Review Center", icon: "flag" },
   { to: "/progress", label: "Progress", icon: "chart" },
   { to: "/profile", label: "Profile", icon: "user" },
 ]
 
-const mobileNavStudent: Array<{ to: string; label: string; icon: IconName }> = [
-  { to: "/dashboard", label: "Dashboard", icon: "home" },
-  { to: "/practice", label: "Practice", icon: "practice" },
-  { to: "/simulator", label: "ML Studio", icon: "formula" },
-  { to: "/mistakes", label: "Mistakes", icon: "flag" },
-  { to: "/progress", label: "Progress", icon: "chart" },
-  { to: "/profile", label: "Profile", icon: "user" },
+const adminNav: Array<{ to: string; label: string; icon: IconName; end?: boolean }> = [
+  { to: "/research", label: "Overview", icon: "flask", end: true },
+  { to: "/simulator", label: "ML Studio & Simulator", icon: "formula" },
+  { to: "/research/showcase", label: "Database Showcase", icon: "database" },
+  { to: "/research/formula-explorer", label: "Formula Explorer", icon: "formula" },
+  { to: "/research/evaluation", label: "Model Evaluation", icon: "evaluation" },
 ]
 
 export default function AppLayout() {
@@ -35,14 +33,7 @@ export default function AppLayout() {
   const mobileClass = ({ isActive }: { isActive: boolean }) => isActive ? "mobile-link active" : "mobile-link"
 
   const isAdmin = user?.role === 'admin'
-  const mobileNav = isAdmin
-    ? [
-        { to: "/research", label: "Overview", icon: "flask" as IconName },
-        { to: "/research/showcase", label: "Database", icon: "database" as IconName },
-        { to: "/research/formula-explorer", label: "Formula", icon: "formula" as IconName },
-        { to: "/research/evaluation", label: "Evaluation", icon: "evaluation" as IconName },
-      ]
-    : mobileNavStudent
+  const navItems = isAdmin ? adminNav : studentNav
 
   return (
     <div className="app-shell">
@@ -51,33 +42,24 @@ export default function AppLayout() {
           <span className="brand-mark" aria-hidden="true">M</span>
           <span className="brand-copy">
             <span className="brand-name">MISTIQ</span>
-            <span className="brand-tag">Mistake Intelligence</span>
+            <span className="brand-tag">{isAdmin ? "Admin & Research Lab" : "Adaptive Learning"}</span>
           </span>
         </NavLink>
 
         <nav aria-label="Main navigation" className="side-nav">
-          <span className="nav-caption">{isAdmin ? 'Admin' : 'Learn'}</span>
-          {isAdmin ? (
-            <>
-              <NavLink to="/research" end className={linkClass}><Icon name="flask" /><span>Overview</span></NavLink>
-              <NavLink to="/research/showcase" className={linkClass}><Icon name="database" /><span>Database</span></NavLink>
-              <NavLink to="/research/formula-explorer" className={linkClass}><Icon name="formula" /><span>Formula explorer</span></NavLink>
-              <NavLink to="/research/evaluation" className={linkClass}><Icon name="evaluation" /><span>Evaluation</span></NavLink>
-            </>
-          ) : (
-            studentNav.map(item => (
-              <NavLink key={item.to} to={item.to} className={linkClass}>
-                <Icon name={item.icon} />
-                <span>{item.label}</span>
-              </NavLink>
-            ))
-          )}
+          <span className="nav-caption">{isAdmin ? 'Admin & Research' : 'Learn'}</span>
+          {navItems.map(item => (
+            <NavLink key={item.to} to={item.to} end={item.end} className={linkClass}>
+              <Icon name={item.icon} />
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
         </nav>
 
         {!isAdmin && (
           <nav aria-label="Research navigation" className="side-nav side-nav-research">
-            <span className="nav-caption">Research</span>
-            <span className="nav-note">Operator access required</span>
+            <span className="nav-caption">Educator &amp; Admin</span>
+            <span className="nav-note">Advanced Research Lab restricted to instructors</span>
           </nav>
         )}
 
@@ -86,7 +68,7 @@ export default function AppLayout() {
             <span className="avatar" aria-hidden="true">{(user.name ?? user.username).slice(0, 1).toUpperCase()}</span>
             <span className="account-copy">
               <strong>{user.name ?? user.username}</strong>
-              <span>{user.role === 'admin' ? 'Operator' : `Student #${user.student_id ?? ''}`}</span>
+              <span>{user.role === 'admin' ? 'Operator / Admin' : `Student #${user.student_id ?? ''}`}</span>
             </span>
             <button type="button" className="sidebar-logout" onClick={() => logout()}>Sign out</button>
           </div>
@@ -111,8 +93,8 @@ export default function AppLayout() {
       <main className="app-main"><div className="app-content"><Outlet /></div></main>
 
       <nav className="mobile-nav" aria-label="Mobile navigation">
-        {mobileNav.map(item => (
-          <NavLink key={item.to} to={item.to} className={mobileClass} end={item.to === '/research'}>
+        {navItems.map(item => (
+          <NavLink key={item.to} to={item.to} className={mobileClass} end={item.end}>
             <Icon name={item.icon} />
             <span>{item.label}</span>
           </NavLink>

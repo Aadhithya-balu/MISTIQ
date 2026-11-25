@@ -29,6 +29,8 @@ function renderApp(path: string) {
   render(<MemoryRouter initialEntries={[path]}><StudentProvider><App /></StudentProvider></MemoryRouter>)
 }
 async function signIn(name = 'Sam Learner') {
+  const tab = screen.queryByRole('button', { name: /create account/i })
+  if (tab) fireEvent.click(tab)
   fireEvent.change(await screen.findByLabelText('Your name'), { target: { value: name } })
   fireEvent.click(screen.getByRole('button', { name: /create my local profile/i }))
 }
@@ -86,30 +88,11 @@ describe('MISTIQ student app', () => {
     expect(screen.getByText('No challenge identified yet')).toBeTruthy()
   })
 
-  it('surfaces offline model quality from the real evaluation results', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input)
-      if (url.endsWith('/students') && init?.method === 'POST') return createProfile()
-      if (url.endsWith('/students/7')) return jsonResponse(profile)
-      if (url.endsWith('/students/7/progress')) return jsonResponse({ student_id: 7, attempt_count: 8, correct_count: 6, accuracy: 0.75, mistake_count: 2 })
-      if (url.endsWith('/students/7/mistakes')) return jsonResponse([])
-      if (url.endsWith('/predictions/7/latest')) return jsonResponse({ detail: 'Insufficient history' }, 409)
-      if (url.endsWith('/research/evaluation')) return jsonResponse({
-        available: true, source: 'experiments/reports/comparison.csv',
-        results: [
-          { model_name: 'MISTIQ-AMPA', seed: 'mean', accuracy: 0.5263, macro_f1: 0.3126, ece: 0.097 },
-          { model_name: 'Majority', seed: 'mean', accuracy: 0.3333, macro_f1: 0.0714, ece: 0.0132 },
-        ],
-      })
-      return jsonResponse({ detail: 'Not found' }, 404)
-    }))
-    renderApp('/dashboard')
-    void signIn()
-    expect(await screen.findByText('How well MISTIQ predicts the next mistake')).toBeTruthy()
-    expect(screen.getAllByText('53%').length).toBeGreaterThan(0)
-    expect(screen.getByText('33%')).toBeTruthy()
-    expect(screen.getByText('Calibration error')).toBeTruthy()
-    expect(screen.getByText('Macro-F1')).toBeTruthy()
+  it('protects students from raw model evaluation benchmarks on dashboard', async () => {
+    setup('/dashboard', { progress: { student_id: 7, attempt_count: 8, correct_count: 6, accuracy: 0.75, mistake_count: 2 } })
+    expect(await screen.findByText('Good to see you, Sam.')).toBeTruthy()
+    expect(screen.queryByText('How well MISTIQ predicts the next mistake')).toBeNull()
+    expect(screen.queryByText('Calibration error')).toBeNull()
   })
 
   it('loads a backend question, submits the answer, and shows checked feedback', async () => {

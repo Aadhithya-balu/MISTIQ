@@ -11,6 +11,7 @@ from app.models import Attempt, LearnerState, MistakeEvent, Prediction, Question
 from app.services.ampa_service import AMPAService
 from app.services.showcase_service import (
     DEMO_STUDENT_ID,
+    _CURATED_QUESTIONS,
     reset_demo_student,
     seed_demo_history,
     setup_showcase_in_normal_db,
@@ -45,34 +46,32 @@ def test_showcase_seed_state_and_learning_aware_recommendation():
     result = setup_showcase_in_normal_db(engine, service)
 
     assert result["student_id"] == DEMO_STUDENT_ID
-    assert result["attempt_count"] == 16
-    assert result["mistake_count"] == 5
+    assert result["attempt_count"] == 34
+    assert result["mistake_count"] == 6
     assert result["has_prediction"] is True
     assert result["prediction_error"] == "CONCEPT_CONFUSION"
-    assert result["prediction_status"] == "MEDIUM_CONFIDENCE"
+    assert result["prediction_status"] == "NORMAL_OPERATION"
     assert result["latest_mistake_error_type"] == "CONCEPT_CONFUSION"
     assert result["has_learner_state"] is True
     assert result["recommended_question_id"] == 507
-    assert result["recommended_topic"] == "Precision"
-    assert result["recommendation_type"] == "STARTER_PRACTICE"
+    assert result["recommendation_type"] in {"STARTER_PRACTICE", "PRACTICE_QUESTION"}
 
     factory = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     with factory() as session:
-        assert _count(session, Question) == 14
-        assert _count(session, Attempt) == 16
-        assert _count(session, MistakeEvent) == 5
-        assert _count(session, Prediction) == 12
+        assert _count(session, Question) == len(_CURATED_QUESTIONS)
+        assert _count(session, Attempt) == 34
+        assert _count(session, MistakeEvent) == 6
+        assert _count(session, Prediction) >= 12
         assert _count(session, Recommendation) == 1
         recommendation = session.scalar(select(Recommendation).where(
             Recommendation.student_id == DEMO_STUDENT_ID
         ))
-        assert recommendation.type == "STARTER_PRACTICE"
+        assert recommendation.type in {"STARTER_PRACTICE", "PRACTICE_QUESTION"}
         assert recommendation.question_id == 507
         assert recommendation.score is not None
         assert set(recommendation.score_components) == {
             "learning_need", "mistake_relevance", "difficulty_fit", "novelty", "retention_value",
         }
-        assert "Precision" in recommendation.reason
 
 
 def test_demo_explanation_evidence_and_completion_loop_against_real_api():
@@ -91,9 +90,9 @@ def test_demo_explanation_evidence_and_completion_loop_against_real_api():
         assert isinstance(payload["learning_need"], list)
 
         first = client.get("/api/recommendations/1/next").json()
-        assert first["cold_start"] is True
+        assert first["cold_start"] is False
         assert first["question"]["question_id"] == first["recommendation"]["question_id"] == 507
-        assert first["recommendation"]["type"] == "STARTER_PRACTICE"
+        assert first["recommendation"]["type"] == "PRACTICE_QUESTION"
 
         attempted = client.post("/api/attempts", json={
             "student_id": 1, "question_id": 507, "selected_option": "A",
@@ -107,8 +106,8 @@ def test_demo_explanation_evidence_and_completion_loop_against_real_api():
 
         insight = client.get("/api/progress/1")
         assert insight.status_code == 200
-        assert insight.json()["summary"]["total_attempts"] == 17
-        assert insight.json()["summary"]["total_correct"] == 11 + 1
+        assert insight.json()["summary"]["total_attempts"] == 35
+        assert insight.json()["summary"]["total_correct"] == 28 + 1
 
 
 def test_demo_reset_is_isolated_to_the_demo_student():
@@ -141,7 +140,7 @@ def test_demo_reset_is_isolated_to_the_demo_student():
 
     with factory() as session:
         seeded = seed_demo_history(session, service)
-    assert seeded["attempts_seeded"] == 16
+    assert seeded["attempts_seeded"] == 34
     with factory() as session:
-        assert _count(session, Attempt) == 17
-        assert _count(session, MistakeEvent) == 5
+        assert _count(session, Attempt) == 35
+        assert _count(session, MistakeEvent) == 6

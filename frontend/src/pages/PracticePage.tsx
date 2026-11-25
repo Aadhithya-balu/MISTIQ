@@ -15,6 +15,17 @@ const optionText = (question: Question, key: OptionKey) =>
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Something went wrong. Please try again.'
 
+export const CURRICULUM_MODULES = [
+  { id: 'all', label: 'All Topics (Mixed 35)' },
+  { id: 'metrics', label: 'Precision & Recall', topics: ['Precision', 'Recall'] },
+  { id: 'regularization', label: 'Ridge & Lasso', topics: ['Ridge', 'Lasso'] },
+  { id: 'generalization', label: 'Overfitting & Underfitting', topics: ['Overfitting', 'Underfitting'] },
+  { id: 'tasks', label: 'Classification & Regression', topics: ['Classification', 'Regression'] },
+  { id: 'linear', label: 'Stack & Queue', topics: ['Stack', 'Queue'] },
+  { id: 'graphs', label: 'BFS & DFS', topics: ['BFS', 'DFS'] },
+  { id: 'statistics', label: 'Mean & Median', topics: ['Mean', 'Median'] },
+]
+
 interface SessionRecord {
   question: Question
   selectedOption: OptionKey
@@ -32,8 +43,9 @@ export function PracticePage() {
   const navigate = useNavigate()
 
   // Mode: 'learn' (Concept Teaching) or 'quiz' (Interactive Testing)
-  const [activeTab, setActiveTab] = useState<'learn' | 'quiz'>('learn')
+  const [activeTab, setActiveTab] = useState<'learn' | 'quiz'>('quiz')
   const [selectedConceptId, setSelectedConceptId] = useState<string>('Precision')
+  const [quizTopicFilter, setQuizTopicFilter] = useState<string>('all')
   const [showInQuizHint, setShowInQuizHint] = useState<boolean>(false)
 
   const [allQuestions, setAllQuestions] = useState<Question[]>([])
@@ -62,15 +74,20 @@ export function PracticePage() {
 
     if (modeParam === 'learn') {
       setActiveTab('learn')
-    } else if (modeParam === 'quiz' || requestedQuestionId) {
+    } else {
       setActiveTab('quiz')
     }
 
     if (topicParam) {
       setSelectedConceptId(topicParam)
+      const foundModule = CURRICULUM_MODULES.find(m =>
+        m.topics?.some(t => t.toLowerCase() === topicParam.toLowerCase()) ||
+        m.id.toLowerCase() === topicParam.toLowerCase()
+      )
+      setQuizTopicFilter(foundModule ? foundModule.id : topicParam)
     }
 
-    getQuestions({ topic: topicParam, subtopic: subtopicParam })
+    getQuestions({ subtopic: subtopicParam })
       .then(items => {
         if (!active) return
         setAllQuestions(items)
@@ -97,11 +114,43 @@ export function PracticePage() {
     return () => { active = false }
   }, [location.search])
 
+  const filteredQuestions = useMemo(() => {
+    if (quizTopicFilter === 'all') return allQuestions
+    const activeModule = CURRICULUM_MODULES.find(m => m.id === quizTopicFilter)
+    if (activeModule?.topics) {
+      return allQuestions.filter(q =>
+        activeModule.topics.some(t => t.toLowerCase() === q.topic.toLowerCase())
+      )
+    }
+    return allQuestions.filter(q =>
+      q.topic.toLowerCase() === quizTopicFilter.toLowerCase() ||
+      (q.subtopic && q.subtopic.toLowerCase() === quizTopicFilter.toLowerCase())
+    )
+  }, [allQuestions, quizTopicFilter])
+
   const questions = useMemo(() => {
-    return allQuestions.slice(0, sessionLength > 0 ? sessionLength : allQuestions.length)
-  }, [allQuestions, sessionLength])
+    return filteredQuestions.slice(0, sessionLength > 0 ? sessionLength : filteredQuestions.length)
+  }, [filteredQuestions, sessionLength])
 
   const question = questions[index]
+
+  const switchQuizModule = (moduleId: string) => {
+    setQuizTopicFilter(moduleId)
+    setIndex(0)
+    setSelected(null)
+    setResult(null)
+    setSessionFinished(false)
+    setSessionHistory([])
+    setShowInQuizHint(false)
+    const activeModule = CURRICULUM_MODULES.find(m => m.id === moduleId)
+    const pool = moduleId === 'all'
+      ? allQuestions
+      : allQuestions.filter(q =>
+          activeModule?.topics?.some(t => t.toLowerCase() === q.topic.toLowerCase()) ||
+          q.topic.toLowerCase() === moduleId.toLowerCase()
+        )
+    setSessionLength(Math.min(5, Math.max(1, pool.length)))
+  }
 
   // Update selected concept guide if question changes
   useEffect(() => {
@@ -200,12 +249,11 @@ export function PracticePage() {
   const activeGuide: ConceptGuide = getConceptGuide(selectedConceptId)
 
   const startQuizForConcept = (topic: string) => {
-    const matchIndex = allQuestions.findIndex(q => q.topic.toLowerCase() === topic.toLowerCase())
-    if (matchIndex >= 0) {
-      setIndex(matchIndex)
-      setSelected(null)
-      setResult(null)
-    }
+    const foundModule = CURRICULUM_MODULES.find(m =>
+      m.topics?.some(t => t.toLowerCase() === topic.toLowerCase()) ||
+      m.id.toLowerCase() === topic.toLowerCase()
+    )
+    switchQuizModule(foundModule ? foundModule.id : topic)
     setActiveTab('quiz')
   }
 
@@ -239,7 +287,7 @@ export function PracticePage() {
         >
           <Icon name="practice" />
           <span>🎯 Practice & Knowledge Test</span>
-          <span className="mode-tab-pill">AMPA Tracked</span>
+          <span className="mode-tab-pill">Adaptive Quiz</span>
         </button>
       </div>
 
@@ -394,7 +442,33 @@ export function PracticePage() {
       {/* ========================================================================= */}
       {activeTab === 'quiz' && (
         <>
-          {loading && <LoadingState label="Finding question…" />}
+          {/* Quiz Topic Filter Selector */}
+          {!loading && allQuestions.length > 0 && (
+            <div className="concept-selector-bar" style={{ marginTop: '4px', marginBottom: '18px' }}>
+              <span className="selector-label">Quiz Topic:</span>
+              <div className="concept-pills-list">
+                {CURRICULUM_MODULES.map(mod => {
+                  const isCurrent = quizTopicFilter === mod.id
+                  const count = mod.id === 'all'
+                    ? allQuestions.length
+                    : allQuestions.filter(q => mod.topics?.some(t => t.toLowerCase() === q.topic.toLowerCase())).length
+                  return (
+                    <button
+                      key={mod.id}
+                      type="button"
+                      className={`concept-pill ${isCurrent ? 'active' : ''}`}
+                      onClick={() => switchQuizModule(mod.id)}
+                    >
+                      <span>{mod.label}</span>
+                      <span className="module-pill-badge">{count}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {loading && <LoadingState label="Finding a question…" />}
 
           {error && !question && <ErrorState message={error} />}
 
@@ -625,15 +699,21 @@ export function PracticePage() {
                           {result.attempt.correct ? '✓' : '↳'}
                         </span>
                         <div>
-                          <h3>{result.attempt.correct ? 'Correct! Well done.' : 'Not quite.'}</h3>
+                          <h3>{result.attempt.correct ? 'Correct.' : 'Not quite.'}</h3>
                           <p>
                             The correct answer is <strong>{result.correct_option}. {result.correct_answer}</strong>
                           </p>
 
+                          {result.mistake_event && (
+                            <p>
+                              This looks like a <strong>{mistakeLabels[result.mistake_event.error_type]?.toLowerCase()}</strong> in {result.mistake_event.subtopic || result.mistake_event.topic}. A good concept to revisit.
+                            </p>
+                          )}
+
                           {result.mistake_event?.error_type === 'CONCEPT_CONFUSION' && (
                             <div className="aha-card">
                               <div className="card-kicker">A pattern MISTIQ noticed</div>
-                              <strong>Concept Confusion Detected</strong>
+                              <strong>Concept confusion</strong>
                               <p className="confusion-pair">
                                 {question.subtopic || question.topic} ↔ {optionText(question, result.attempt.selected_option)}
                               </p>

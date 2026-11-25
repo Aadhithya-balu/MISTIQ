@@ -4,9 +4,8 @@ import { useStudent } from '../context/StudentContext'
 import { getProgress, getMistakes } from '../api/students'
 import { getLatestPrediction, getLatestExplanation } from '../api/predictions'
 import { getNextRecommendation } from '../api/recommendations'
-import { getResearchEvaluation } from '../api/research'
 import { mistakeLabels } from '../constants/errorLabels'
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader, MLEngineHUD } from '../components'
+import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '../components'
 import type { MistakeEvent, Prediction, PredictionExplanation, Progress, RecommendedPractice } from '../types/entities'
 
 const errorMessage = (error: unknown) =>
@@ -15,7 +14,7 @@ const errorMessage = (error: unknown) =>
 function PredictionCard({
   prediction,
   explanation,
-  empty = false,
+  empty,
 }: {
   prediction: Prediction | null
   explanation: PredictionExplanation | null
@@ -24,12 +23,12 @@ function PredictionCard({
   if (!prediction) {
     return (
       <Card className="prediction-card">
-        <div className="card-kicker">Likely next challenge</div>
+        <div className="card-kicker">Recommended Study Focus</div>
         <div className="prediction-empty">
           <span className="illustration-mark" aria-hidden="true">✳</span>
           <div>
             <h3>{empty ? 'Keep practicing' : 'No challenge identified yet'}</h3>
-            <p>We need a little more practice history before we can identify a likely challenge.</p>
+            <p>Complete a quick quiz to receive personalized topic recommendations based on your responses.</p>
           </div>
         </div>
       </Card>
@@ -37,23 +36,20 @@ function PredictionCard({
   }
 
   const reliable = prediction.status === 'NORMAL_OPERATION'
+  const conceptName = explanation?.learning_need?.[0] || 'Precision'
 
   return (
     <Card className="prediction-card">
       <div className="card-kicker">
-        Likely next challenge{' '}
-        <span className={reliable ? 'signal-pill' : 'signal-pill signal-early'}>
-          {reliable ? 'Normal operation' : 'Early signal'}
-        </span>
+        Personalized Study Focus{' '}
+        <span className="signal-pill">Adaptive Recommendation</span>
       </div>
       <div className="prediction-content">
         <span className="prediction-icon" aria-hidden="true">◉</span>
         <div>
           <h3>{mistakeLabels[prediction.prediction] || prediction.prediction.split('_').join(' ').toLowerCase()}</h3>
           <p>
-            {reliable
-              ? 'This estimate comes from the sequence of your recorded practice.'
-              : 'This is an early signal from your practice so far. Keep exploring different questions.'}
+            Based on your recent practice history, focusing on this topic will help reinforce your understanding and avoid common exam traps.
           </p>
           {prediction.prediction === 'CONCEPT_CONFUSION' && explanation?.learning_need?.length ? (
             <p className="pattern-highlight">Recent concept confusion: {explanation.learning_need.join(', ')}</p>
@@ -65,15 +61,18 @@ function PredictionCard({
               <span>Data reliability <strong>{(prediction.reliability * 100).toFixed(0)}%</strong></span>
             </div>
           )}
-          <div style={{ marginTop: '10px' }}>
-            <Link className="text-link" to={`/practice?topic=${encodeURIComponent(explanation?.learning_need?.[0] || 'Precision')}&mode=learn`}>
-              📖 Study {explanation?.learning_need?.[0] || 'this concept'} lesson & notes →
+          <div style={{ display: 'flex', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
+            <Link className="button button-secondary" to={`/practice?topic=${encodeURIComponent(conceptName)}&mode=learn`}>
+              📖 Study {conceptName} Notes
+            </Link>
+            <Link className="button" to={`/practice?topic=${encodeURIComponent(conceptName)}&mode=quiz`}>
+              🎯 Practice {conceptName}
             </Link>
           </div>
         </div>
       </div>
       {explanation && (
-        <details className="prediction-why">
+        <details className="prediction-why" style={{ marginTop: '14px' }}>
           <summary>Why am I seeing this?</summary>
           <p>{explanation.summary}</p>
           {explanation.evidence?.length > 0 && (
@@ -125,55 +124,14 @@ function RecommendationCard({ recommendation }: { recommendation: RecommendedPra
         <Link className="button button-secondary" to={`/practice?topic=${encodeURIComponent(recommendation.question.topic)}&mode=learn`}>
           📖 Study Concept Guide
         </Link>
-        <Link className="button" to={`/practice?question=${recommendation.question.question_id}&mode=quiz`}>
-          🎯 Take Practice Quiz →
+        <Link
+          className="button"
+          to={`/practice?question=${recommendation.question.question_id}`}
+          aria-label="Try this question"
+        >
+          🎯 Try this question →
         </Link>
       </div>
-    </Card>
-  )
-}
-
-function ModelPerformanceCard() {
-  const [evaluation, setEvaluation] = useState<Record<string, any> | null>(null)
-
-  useEffect(() => {
-    let active = true
-    getResearchEvaluation()
-      .then(value => { if (active) setEvaluation(value) })
-      .catch(() => undefined)
-    return () => { active = false }
-  }, [])
-
-  const rows = Array.isArray(evaluation?.results) ? (evaluation.results as Record<string, any>[]) : []
-  const mean = (name: string) => rows.find(row => row.model_name === name && String(row.seed) === 'mean')
-  const ampa = mean('MISTIQ-AMPA')
-  if (!ampa) return null
-  const majority = mean('Majority')
-  const percent = (value: unknown) => `${Math.round(Number(value) * 100)}%`
-
-  return (
-    <Card className="model-card">
-      <div className="section-heading">
-        <div>
-          <div className="card-kicker">AMPA Engine Benchmark · Not Personal Score</div>
-          <h3>How well MISTIQ predicts the next mistake</h3>
-        </div>
-        <Link to="/research" className="text-link">
-          Research Lab <span aria-hidden="true">→</span>
-        </Link>
-      </div>
-      <p className="body-copy">
-        On an offline benchmark built from MISTIQ's synthetic practice data, the AMPA model predicts the next mistake category correctly {percent(ampa.accuracy)} of the time{majority ? `, compared with ${percent(majority.accuracy)} for always guessing the most common pattern` : ''}. Its predicted confidence is well calibrated, with {percent(ampa.ece)} expected calibration error.
-      </p>
-      <div className="research-facts">
-        <span>Accuracy<strong>{percent(ampa.accuracy)}</strong></span>
-        <span>Macro-F1<strong>{Number(ampa.macro_f1).toFixed(2)}</strong></span>
-        <span>Calibration error<strong>{percent(ampa.ece)}</strong></span>
-        <span>Majority baseline<strong>{majority ? percent(majority.accuracy) : '—'}</strong></span>
-      </div>
-      <p className="quiet-note">
-        Measured offline on the synthetic benchmark used for evaluation, not from your live practice sessions.
-      </p>
     </Card>
   )
 }
@@ -219,19 +177,25 @@ export function DashboardPage() {
   }, [studentId])
 
   useEffect(() => {
-    if (!studentId || !prediction) return
+    if (!studentId) return
     let active = true
+
     getLatestExplanation(studentId)
-      .then(value => { if (active) setExplanation(value) })
-      .catch(() => undefined)
+      .then(nextExplanation => {
+        if (active) setExplanation(nextExplanation)
+      })
+      .catch(() => {
+        if (active) setExplanation(null)
+      })
+
     return () => { active = false }
   }, [studentId, prediction?.id])
 
   if (loading) {
     return (
       <>
-        <PageHeader title="Your dashboard" description="A little progress, one question at a time." />
-        <LoadingState label="Loading your learning summary…" />
+        <PageHeader title="Your dashboard" description="Loading your personalized learning path…" />
+        <LoadingState label="Preparing your dashboard…" />
       </>
     )
   }
@@ -253,49 +217,45 @@ export function DashboardPage() {
     <>
       <PageHeader
         title={`Good to see you, ${firstName}.`}
-        description="Small steps add up. Pick up where you left off."
+        description="Pick up where you left off and strengthen your concept mastery."
       />
       <div className="dashboard-grid">
         {/* Welcome Card & Primary Action */}
         <Card className="welcome-card">
           <div className="welcome-content">
-            <span className="eyebrow">Your next step</span>
-            <h2>Make a little progress today.</h2>
-            <p>Work through a question at your own pace. Your learning history will help MISTIQ show useful patterns over time.</p>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '16px' }}>
+            <span className="eyebrow">Your Daily Practice</span>
+            <h2>Continue your learning path today.</h2>
+            <p>Consistent, targeted problem-solving builds conceptual clarity. Work through lessons at your own pace.</p>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '16px', flexWrap: 'wrap' }}>
               <Link className="button" to="/practice">
-                Start practicing <span aria-hidden="true">→</span>
+                Start Practicing <span aria-hidden="true">→</span>
               </Link>
-              {studentId > 0 && (
-                <span className="badge badge-accent">
-                  Profile: {rawName} (ID #{studentId})
-                </span>
-              )}
+              <Link className="button button-secondary" to="/practice?mode=learn">
+                Browse Concept Guides 📖
+              </Link>
             </div>
           </div>
           <div className="welcome-decoration" aria-hidden="true">✳</div>
         </Card>
 
-        {studentId > 0 && <MLEngineHUD studentId={studentId} />}
-
         {/* 1. Student Personal Progress Card */}
         <Card className="summary-card">
           <div className="section-heading">
             <div>
-              <div className="card-kicker">Your progress</div>
-              <h3>A steady start</h3>
+              <div className="card-kicker">Your Learning Stats</div>
+              <h3>Current Progress</h3>
             </div>
             <Link to="/progress" className="text-link">
-              View progress <span aria-hidden="true">→</span>
+              View full progress <span aria-hidden="true">→</span>
             </Link>
           </div>
           {!progress?.attempt_count ? (
             <EmptyState
-              title="Your first session starts here"
-              description="Your progress summary will take shape as you practice."
+              title="Your learning journey begins here"
+              description="Complete your first practice quiz to generate personalized mastery metrics."
             >
               <Link className="button button-secondary" to="/practice">
-                Take First 5-Question Quiz <span aria-hidden="true">→</span>
+                Take First Practice Quiz <span aria-hidden="true">→</span>
               </Link>
             </EmptyState>
           ) : (
@@ -303,7 +263,7 @@ export function DashboardPage() {
               <div className="stat-row">
                 <div>
                   <strong>{progress.attempt_count}</strong>
-                  <span>Questions tried</span>
+                  <span>Questions Solved</span>
                 </div>
                 <div>
                   <strong>{Math.round(progress.accuracy * 100)}<small>%</small></strong>
@@ -311,30 +271,30 @@ export function DashboardPage() {
                 </div>
                 <div>
                   <strong>{progress.mistake_count}</strong>
-                  <span>Things to review</span>
+                  <span>Items to Review</span>
                 </div>
               </div>
               <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--muted)' }}>
                 <span>Correct answers: <strong>{progress.correct_count}</strong></span>
-                <span>Current streak: <strong>{progress.summary?.current_streak ?? 0}</strong></span>
-                <span>Topics practiced: <strong>{progress.summary?.topics_practiced ?? progress.topic_performance?.length ?? 1}</strong></span>
+                <span>Active streak: <strong>{progress.summary?.current_streak ?? 0} days</strong></span>
+                <span>Topics covered: <strong>{progress.summary?.topics_practiced ?? progress.topic_performance?.length ?? 1}</strong></span>
               </div>
             </>
           )}
         </Card>
 
-        {/* 2. Likely Next Challenge Card */}
+        {/* 2. Personalized Study Focus Card */}
         <PredictionCard prediction={prediction} explanation={explanation} empty={!progress?.attempt_count} />
 
         {/* 3. Recommended Practice Card */}
         <RecommendationCard recommendation={recommendation} />
 
-        {/* 4. Recent Mistakes Card */}
+        {/* 4. Review Items Card */}
         <Card className="recent-card">
           <div className="section-heading">
             <div>
-              <div className="card-kicker">Recent learning</div>
-              <h3>Mistakes are useful clues</h3>
+              <div className="card-kicker">Review Center</div>
+              <h3>Recent Misconceptions</h3>
             </div>
             <Link to="/mistakes" className="text-link">
               Review all <span aria-hidden="true">→</span>
@@ -355,14 +315,11 @@ export function DashboardPage() {
             </ul>
           ) : (
             <EmptyState
-              title="A clean slate"
-              description="Your recent review topics will show up here after a practice session."
+              title="All clear"
+              description="Any concepts you find tricky during practice will appear here for easy review."
             />
           )}
         </Card>
-
-        {/* 5. Offline Model Benchmark (Explicitly labeled as Research Benchmark) */}
-        <ModelPerformanceCard />
       </div>
     </>
   )

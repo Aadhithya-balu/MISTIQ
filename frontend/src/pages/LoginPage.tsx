@@ -1,31 +1,35 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useStudent, getRecentStudents } from '../context/StudentContext'
+import { useStudent } from '../context/StudentContext'
 import { Button, Card, ErrorState } from '../components'
 import { ApiError } from '../api/client'
 
 export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { enter, reconnect, login, restoreError, clearRestoreError } = useStudent()
+  const { enter, reconnect, login, register, restoreError, clearRestoreError } = useStudent()
 
-  // Username & Password credentials
+  // Tab: 'signin' | 'register'
+  const [tab, setTab] = useState<'signin' | 'register'>('register')
+
+  // Sign In state
   const [loginUsername, setLoginUsername] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
 
-  // Local profile creation
-  const [name, setName] = useState('')
+  // Register / Local Profile state
+  const [registerName, setRegisterName] = useState('')
+  const [registerUsername, setRegisterUsername] = useState('')
+  const [registerPassword, setRegisterPassword] = useState('')
+
+  // Legacy Student ID reconnect
   const [studentId, setStudentId] = useState('')
-  const [selectedTrack, setSelectedTrack] = useState('Machine Learning & Evaluation')
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  const recentStudents = getRecentStudents()
   const from = (location.state as any)?.from || '/dashboard'
 
-  // Standard Username & Password sign-in
-  const handlePasswordLogin = async (e: FormEvent) => {
+  const handleSignIn = async (e: FormEvent) => {
     e.preventDefault()
     if (!loginUsername.trim() || !loginPassword) return
     setBusy(true)
@@ -36,7 +40,7 @@ export function LoginPage() {
       navigate(destination, { replace: true })
     } catch (err) {
       if (err instanceof ApiError && err.status === 0) {
-        setError('MISTIQ could not reach the learning service. Check that the backend is running.')
+        setError('Could not reach the learning service. Check that the backend is running.')
       } else {
         setError(err instanceof Error ? err.message : 'Incorrect username or password. Please try again.')
       }
@@ -45,38 +49,32 @@ export function LoginPage() {
     }
   }
 
-  // Quick 1-click credential autofill
-  const fillCredentials = (user: string, pass: string) => {
-    setLoginUsername(user)
-    setLoginPassword(pass)
-    clearRestoreError()
-    setError('')
-  }
-
-  // Local profile creation (Name only)
-  const handleCreateProfile = async (e: FormEvent) => {
+  const handleCreateAccount = async (e: FormEvent) => {
     e.preventDefault()
-    if (!name.trim()) return
+    if (!registerName.trim()) return
     setBusy(true)
     setError('')
     try {
-      await enter(name.trim())
+      if (registerUsername.trim() && registerPassword) {
+        await register(registerName.trim(), registerUsername.trim(), registerPassword)
+      } else {
+        await enter(registerName.trim())
+      }
       navigate(from, { replace: true })
     } catch (err) {
       if (err instanceof ApiError && err.status === 0) {
-        setError('MISTIQ could not reach the learning service. Check that the backend is running.')
+        setError('Could not reach the learning service. Check that the backend is running.')
       } else {
-        setError(err instanceof Error ? err.message : 'Could not create profile. Please try again.')
+        setError(err instanceof Error ? err.message : 'Could not set up profile. Please try again.')
       }
     } finally {
       setBusy(false)
     }
   }
 
-  // Reconnect with Student ID
-  const handleReconnectProfile = async (e?: FormEvent, targetId?: number) => {
-    if (e) e.preventDefault()
-    const idToUse = targetId !== undefined ? targetId : parseInt(studentId, 10)
+  const handleReconnectProfile = async (e: FormEvent) => {
+    e.preventDefault()
+    const idToUse = parseInt(studentId, 10)
     if (isNaN(idToUse) || idToUse <= 0) return
     setBusy(true)
     setError('')
@@ -85,7 +83,7 @@ export function LoginPage() {
       navigate(from, { replace: true })
     } catch (err) {
       if (err instanceof ApiError && err.status === 0) {
-        setError('MISTIQ could not reach the learning service. Check that the backend is running.')
+        setError('Could not reach the learning service. Check that the backend is running.')
       } else {
         setError(err instanceof Error ? err.message : 'Student profile not found. Please check your ID.')
       }
@@ -94,245 +92,270 @@ export function LoginPage() {
     }
   }
 
+  const handleQuickDemo = async (role: 'student' | 'admin') => {
+    setBusy(true)
+    setError('')
+    clearRestoreError()
+    try {
+      if (role === 'admin') {
+        await login('admin', 'admin')
+        navigate('/research', { replace: true })
+      } else {
+        await login('student', 'student123')
+        navigate('/dashboard', { replace: true })
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 0) {
+        setError('Could not reach the learning service. Check that the backend is running.')
+      } else {
+        setError(err instanceof Error ? err.message : 'Could not sign in with demo credentials.')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <main className="entry-page">
-      {/* Educational Platform Portal Header */}
       <header className="entry-topbar">
         <div className="portal-brand">
           <div className="brand-mark" aria-hidden="true">M</div>
           <div className="brand-copy">
             <span className="brand-name">MISTIQ</span>
-            <span className="brand-tag">Adaptive Mistake Intelligence Platform</span>
+            <span className="brand-tag">Adaptive Learning &amp; Concept Mastery</span>
           </div>
         </div>
         <div className="portal-status-badge">
           <span className="status-dot-pulse" aria-hidden="true" />
-          <span>Local Engine &amp; SQLite Ready</span>
+          <span>Learning Platform Active</span>
         </div>
       </header>
 
       <div className="entry-grid">
-        {/* Left Hero Section: Educational Value Proposition */}
+        {/* Left Hero Section: LMS Value Proposition */}
         <section className="entry-intro">
-          <span className="eyebrow">Adaptive Learning Intelligence</span>
+          <span className="eyebrow">Personalized Concept Mastery</span>
           <h1>A learning system that predicts what a student may struggle with next by learning from how their mistakes evolve over time.</h1>
           <p>
-            MISTIQ turns incorrect answers into structured learning opportunities. By classifying mistake types (concept confusions, calculation errors, traps) and tracking sequential transitions with AMPA Markov models, MISTIQ guides your practice directly to the root of your misconceptions.
+            Unlike traditional platforms that just say "Incorrect" and move on, MISTIQ learns why you struggled—whether it was conceptual confusion, a missed step, or a tricky distractor—and recommends the exact lesson to fix it.
           </p>
 
           <div className="portal-features-grid">
             <div className="portal-feature-item">
               <div className="feature-icon" aria-hidden="true">🎯</div>
               <div>
-                <strong>Targeted Mistake Remediation</strong>
-                <p>Pinpoint exact conceptual traps like Precision vs Recall with focused drills.</p>
+                <strong>Targeted Conceptual Clarification</strong>
+                <p>Pinpoint confusing dual concepts (like Precision vs. Recall or L1 vs. L2) before exam day.</p>
               </div>
             </div>
             <div className="portal-feature-item">
-              <div className="feature-icon" aria-hidden="true">🧠</div>
+              <div className="feature-icon" aria-hidden="true">📈</div>
               <div>
-                <strong>AMPA Markov Transitions</strong>
-                <p>Calculates empirical transition matrices to predict likely upcoming confusion states.</p>
+                <strong>Adaptive Learning Path</strong>
+                <p>Quizzes and recommendations adapt automatically based on your real practice history.</p>
               </div>
             </div>
             <div className="portal-feature-item">
-              <div className="feature-icon" aria-hidden="true">🛡️</div>
+              <div className="feature-icon" aria-hidden="true">💡</div>
               <div>
-                <strong>100% Local &amp; Empirical</strong>
-                <p>Every accuracy metric, recovery signal, and prediction is computed from your practice in the local database.</p>
+                <strong>Intuition-First Explanations</strong>
+                <p>Clear, side-by-side mental models and distractor breakdowns for every problem.</p>
               </div>
             </div>
           </div>
 
           <div className="entry-note">
             <span className="note-mark" aria-hidden="true">✳</span>
-            <span>Every number you see — accuracy, predictions, recommendations — is computed from your own recorded practice in MISTIQ's local database. No sample data.</span>
+            <span>Your progress, review items, and recommended lessons are computed from your own practice sessions.</span>
           </div>
 
-          <div className="showcase-cta">
-            <a className="button" href="#create-profile">
-              Create your local profile <span aria-hidden="true">→</span>
-            </a>
+          <div className="showcase-cta" style={{ marginTop: '20px' }}>
             <a className="text-link" href="#learn-more">
-              How it works
+              How it works <span aria-hidden="true">→</span>
             </a>
           </div>
         </section>
 
-        {/* Right Auth Portal Column */}
+        {/* Right Auth Portal Column: Single Clean LMS Authentication Card */}
         <div className="auth-portal-column">
-          {/* Main Card: Proper Username and Password Sign-in */}
-          <Card className="entry-card" id="signin-card">
-            <div className="portal-tab-header">
-              <span className="eyebrow">Sign In with Credentials</span>
-            </div>
+          <Card className="entry-card" id="auth-card">
+            <span className="eyebrow">Student &amp; Educator Portal</span>
+            <p style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px', marginBottom: '14px' }}>
+              <span>Continue with a local profile</span> or sign in with your credentials.
+            </p>
 
-            <h2>Sign in to MISTIQ</h2>
-            <p>Enter your username and password to resume your learning session.</p>
-
-            {restoreError && (
-              <div style={{ marginTop: '12px' }}>
-                <ErrorState message={restoreError} />
-              </div>
-            )}
-            {error && (
-              <div style={{ marginTop: '12px' }}>
-                <ErrorState message={error} />
-              </div>
-            )}
-
-            <form onSubmit={handlePasswordLogin} className="form-stack">
-              <label htmlFor="login-username">Username</label>
-              <input
-                id="login-username"
-                value={loginUsername}
-                onChange={e => {
-                  setLoginUsername(e.target.value)
-                  if (restoreError) clearRestoreError()
-                  if (error) setError('')
-                }}
-                placeholder="e.g. student or admin"
-                required
-              />
-
-              <label htmlFor="login-password">Password</label>
-              <input
-                id="login-password"
-                type="password"
-                value={loginPassword}
-                onChange={e => {
-                  setLoginPassword(e.target.value)
-                  if (restoreError) clearRestoreError()
-                  if (error) setError('')
-                }}
-                placeholder="Enter your password"
-                required
-              />
-
-              <Button type="submit" disabled={busy || !loginUsername.trim() || !loginPassword}>
-                {busy ? 'Signing in…' : 'Sign in with Password'} <span aria-hidden="true">→</span>
-              </Button>
-            </form>
-
-            {/* Quick Demo Credentials Autofill */}
-            <div className="demo-credentials-box">
-              <span className="demo-cred-label">Quick Demo Credentials:</span>
-              <div className="demo-cred-actions">
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  style={{ fontSize: '11.5px', padding: '5px 10px' }}
-                  onClick={() => fillCredentials('student', 'student123')}
-                >
-                  🎓 Demo Student (student)
-                </button>
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  style={{ fontSize: '11.5px', padding: '5px 10px' }}
-                  onClick={() => fillCredentials('admin', 'admin')}
-                >
-                  🔬 Admin (admin)
-                </button>
-              </div>
-            </div>
-          </Card>
-
-          {/* Secondary Card: Local Profile Creation & Student ID Reconnect */}
-          <Card className="entry-card" id="create-profile" style={{ marginTop: '20px' }}>
-            <span className="eyebrow">Local Profile &amp; Enrollment</span>
-            <h2>Continue with a local profile</h2>
-            <p>Your profile, practice history, and predictions are stored in the local MISTIQ database on this machine. No account, email, or sign-up is required.</p>
-
-            {/* Learning Track Selector */}
-            <div className="track-selector">
-              <span className="track-label">Target Learning Track:</span>
-              <div className="track-pills">
-                {['Machine Learning & Evaluation', 'Classification & Confusion Pairs', 'Statistical Diagnostics'].map(track => (
-                  <button
-                    key={track}
-                    type="button"
-                    className={`track-pill ${selectedTrack === track ? 'active' : ''}`}
-                    onClick={() => setSelectedTrack(track)}
-                  >
-                    {track}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <form onSubmit={handleCreateProfile} className="form-stack">
-              <label htmlFor="student-name">Your name</label>
-              <input
-                id="student-name"
-                value={name}
-                maxLength={200}
-                onChange={e => setName(e.target.value)}
-                placeholder="e.g. Alex or Maya"
-                required
-              />
-              <Button type="submit" disabled={busy || !name.trim()}>
-                {busy ? 'Enrolling…' : 'Create my local profile'} <span aria-hidden="true">→</span>
-              </Button>
-            </form>
-
-            {/* Quick Profile Resume for Returning Learners */}
-            {recentStudents.length > 0 && (
-              <div className="recent-profiles-box">
-                <span className="recent-profiles-label">Recent Profiles On This Machine:</span>
-                <div className="recent-profiles-list">
-                  {recentStudents.map(r => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      className="recent-profile-chip"
-                      onClick={() => handleReconnectProfile(undefined, r.id)}
-                      disabled={busy}
-                    >
-                      <span className="recent-chip-avatar">{r.name.slice(0, 1).toUpperCase()}</span>
-                      <span className="recent-chip-name">{r.name}</span>
-                      <span className="recent-chip-id">#{r.id}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="form-divider"><span>Already have a profile?</span></div>
-
-            {/* 1-Click Demo Shortcut */}
-            <div className="demo-quickstart-banner">
+            {/* Mode Switcher Tabs */}
+            <div className="auth-tab-bar" style={{ display: 'flex', gap: '8px', marginBottom: '18px', borderBottom: '1px solid var(--line)', paddingBottom: '10px' }}>
               <button
                 type="button"
-                className="demo-quickstart-btn"
-                onClick={() => {
-                  setStudentId('1')
-                  handleReconnectProfile(undefined, 1)
-                }}
-                disabled={busy}
+                className={`button ${tab === 'signin' ? '' : 'button-secondary'}`}
+                style={{ flex: 1, padding: '9px 12px' }}
+                onClick={() => { setTab('signin'); setError('') }}
               >
-                <span className="demo-sparkle" aria-hidden="true">⚡</span>
-                <span><strong>1-Click Demo:</strong> Load Demo Account (ID: 1)</span>
+                Sign In
+              </button>
+              <button
+                type="button"
+                className={`button ${tab === 'register' ? '' : 'button-secondary'}`}
+                style={{ flex: 1, padding: '9px 12px' }}
+                onClick={() => { setTab('register'); setError('') }}
+              >
+                Create Account
               </button>
             </div>
 
-            <form onSubmit={handleReconnectProfile} className="form-stack">
-              <label htmlFor="student-id">Student ID</label>
-              <div className="inline-form">
-                <input
-                  id="student-id"
-                  type="number"
-                  min="1"
-                  value={studentId}
-                  onChange={e => setStudentId(e.target.value)}
-                  placeholder="Enter your ID (e.g. 1)"
-                  required
-                />
-                <Button type="submit" className="button-secondary" disabled={busy || !studentId}>
-                  Continue
-                </Button>
+            {tab === 'signin' ? (
+              <>
+                <h2>Welcome Back</h2>
+                <p style={{ color: 'var(--muted)', fontSize: '13.5px', marginBottom: '16px' }}>
+                  Sign in to continue your courses and practice sessions.
+                </p>
+
+                {restoreError && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <ErrorState message={restoreError} />
+                  </div>
+                )}
+                {error && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <ErrorState message={error} />
+                  </div>
+                )}
+
+                <form onSubmit={handleSignIn} className="form-stack">
+                  <label htmlFor="login-username">Username</label>
+                  <input
+                    id="login-username"
+                    value={loginUsername}
+                    onChange={e => {
+                      setLoginUsername(e.target.value)
+                      if (restoreError) clearRestoreError()
+                      if (error) setError('')
+                    }}
+                    placeholder="Enter your username (e.g. student)"
+                    required
+                    autoComplete="username"
+                  />
+
+                  <label htmlFor="login-password">Password</label>
+                  <input
+                    id="login-password"
+                    type="password"
+                    value={loginPassword}
+                    onChange={e => {
+                      setLoginPassword(e.target.value)
+                      if (restoreError) clearRestoreError()
+                      if (error) setError('')
+                    }}
+                    placeholder="Enter your password"
+                    required
+                    autoComplete="current-password"
+                  />
+
+                  <Button type="submit" disabled={busy || !loginUsername.trim() || !loginPassword}>
+                    {busy ? 'Signing in…' : 'Sign In'} <span aria-hidden="true">→</span>
+                  </Button>
+                </form>
+              </>
+            ) : (
+              <>
+                <h2>Create Your Student Profile</h2>
+                <p style={{ color: 'var(--muted)', fontSize: '13.5px', marginBottom: '16px' }}>
+                  Enroll in MISTIQ to receive adaptive practice and concept mastery guidance. No account, email, or sign-up is required.
+                </p>
+
+                {error && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <ErrorState message={error} />
+                  </div>
+                )}
+
+                <form onSubmit={handleCreateAccount} className="form-stack">
+                  <label htmlFor="student-name">Your name</label>
+                  <input
+                    id="student-name"
+                    value={registerName}
+                    onChange={e => {
+                      setRegisterName(e.target.value)
+                      if (error) setError('')
+                    }}
+                    placeholder="e.g. Alex Johnson"
+                    required
+                    autoComplete="name"
+                  />
+
+                  <label htmlFor="register-username">Username (Optional)</label>
+                  <input
+                    id="register-username"
+                    value={registerUsername}
+                    onChange={e => setRegisterUsername(e.target.value)}
+                    placeholder="Choose a username"
+                    autoComplete="username"
+                  />
+
+                  <label htmlFor="register-password">Password (Optional)</label>
+                  <input
+                    id="register-password"
+                    type="password"
+                    value={registerPassword}
+                    onChange={e => setRegisterPassword(e.target.value)}
+                    placeholder="Create a password"
+                    autoComplete="new-password"
+                  />
+
+                  <Button type="submit" disabled={busy || !registerName.trim()}>
+                    {busy ? 'Creating profile…' : 'Create my local profile'} <span aria-hidden="true">→</span>
+                  </Button>
+                </form>
+              </>
+            )}
+
+            {/* Quick 1-Click Access for Evaluators and Demos */}
+            <div className="demo-credentials-box" style={{ marginTop: '20px', paddingTop: '14px', borderTop: '1px solid var(--line)' }}>
+              <span className="demo-cred-label" style={{ display: 'block', fontSize: '12px', color: 'var(--muted)', marginBottom: '8px' }}>
+                Quick 1-Click Demo Portals:
+              </span>
+              <div className="demo-cred-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  style={{ flex: 1, fontSize: '12px', padding: '7px 10px' }}
+                  onClick={() => handleQuickDemo('student')}
+                  disabled={busy}
+                >
+                  🎓 Demo Student Portal
+                </button>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  style={{ flex: 1, fontSize: '12px', padding: '7px 10px' }}
+                  onClick={() => handleQuickDemo('admin')}
+                  disabled={busy}
+                >
+                  🔬 Admin / Research Portal
+                </button>
               </div>
-            </form>
+
+              {/* Discreet Legacy ID Reconnect for Testing/Demos */}
+              <details style={{ marginTop: '12px', fontSize: '12px', color: 'var(--muted)', textAlign: 'left' }}>
+                <summary style={{ cursor: 'pointer', padding: '4px 0', opacity: 0.8 }}>Reconnect with existing Student ID</summary>
+                <form onSubmit={handleReconnectProfile} style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <label htmlFor="student-id" style={{ margin: 0, fontSize: '12px', whiteSpace: 'nowrap' }}>Student ID</label>
+                  <input
+                    id="student-id"
+                    type="number"
+                    min="1"
+                    value={studentId}
+                    onChange={e => setStudentId(e.target.value)}
+                    placeholder="e.g. 1"
+                    style={{ flex: 1, padding: '5px 8px', fontSize: '12px' }}
+                  />
+                  <Button type="submit" className="button-secondary" style={{ padding: '5px 12px', fontSize: '12px' }} disabled={busy || !studentId}>
+                    Continue
+                  </Button>
+                </form>
+              </details>
+            </div>
           </Card>
         </div>
       </div>
@@ -347,8 +370,8 @@ export function LoginPage() {
         <div className="learn-steps">
           <article>
             <span className="learn-step-num">1</span>
-            <h3>Create a local profile</h3>
-            <p>No account, email, or sign-up. Reconnect anytime with your student ID.</p>
+            <h3>Create your profile</h3>
+            <p>Get started with your student account to begin your personalized learning path.</p>
           </article>
           <article>
             <span className="learn-step-num">2</span>
@@ -357,13 +380,13 @@ export function LoginPage() {
           </article>
           <article>
             <span className="learn-step-num">3</span>
-            <h3>See what may come next</h3>
-            <p>AMPA predicts a likely next challenge and suggests a question, using only your real history.</p>
+            <h3>Master key concepts</h3>
+            <p>Adaptive recommendations guide you to high-yield review topics and concept boundaries.</p>
           </article>
         </div>
       </section>
 
-      <footer className="entry-footer">MISTIQ 2.0 &middot; Local learning profiles</footer>
+      <footer className="entry-footer">MISTIQ Learning Platform &middot; Adaptive Student Mastery</footer>
     </main>
   )
 }
